@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#2D6BE4">
 <title>강동구청소년MAP핑!</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=557f3fbfc7031d8ac127d8c4c7ad3b2f&libraries=services"></script>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=557f3fbfc7031d8ac127d8c4c7ad3b2f&libraries=services&autoload=false"></script>
 <style>
 :root{
   --primary:#2D6BE4;--pl:#EBF1FD;--pd:#1D57CC;
@@ -855,7 +855,9 @@ function submitF(){
 }
 
 // ==================== 초기화 ====================
-window.addEventListener('load', initMap);
+window.addEventListener('load', ()=>{
+  kakao.maps.load(initMap);
+});
 </script>
 </body>
 </html>
