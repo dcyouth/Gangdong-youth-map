@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="청소년MAP핑">
+<meta name="theme-color" content="#2D6BE4">
+<title>강동구청소년MAP핑!</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=557f3fbfc7031d8ac127d8c4c7ad3b2f&libraries=services"></script>
+<style>
+:root{
+  --primary:#2D6BE4;--pl:#EBF1FD;--pd:#1D57CC;
+  --act:#2D6BE4;--act-bg:#EBF1FD;
+  --wel:#16A97B;--wel-bg:#E6F7F2;
+  --oth:#E8820C;--oth-bg:#FEF3E6;
+  --bg:#F5F7FA;--card:#fff;--bdr:#E2E6ED;
+  --tx:#1A202C;--tx2:#6B7A8F;--tx3:#A0ABBF;
+  --r:12px;--rs:8px;
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
+  --top-h:56px;
+  --tab-h:48px;
+  --filter-btn-h:44px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);}
+button,input,select,a{font-family:inherit;}
+
+/* ─── 상단 헤더 ─── */
+.top-header{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  padding-top:var(--st);
+  height:calc(var(--top-h) + var(--st));
+  background:#fff;border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;justify-content:space-between;
+  padding-left:16px;padding-right:12px;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);
+}
+.top-logo{display:flex;align-items:center;gap:9px;}
+.top-logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#2D6BE4,#5B8DF5);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0;}
+.top-logo-text{font-size:15px;font-weight:900;letter-spacing:-.3px;}
+.top-logo-sub{font-size:10px;color:var(--tx3);}
+.top-btns{display:flex;gap:6px;}
+.top-btn{background:none;border:1px solid var(--bdr);border-radius:var(--rs);padding:7px 11px;font-size:12px;color:var(--tx2);cursor:pointer;white-space:nowrap;min-height:34px;}
+.top-btn.accent{background:var(--pl);border-color:#C4D4F8;color:var(--primary);font-weight:600;}
+
+/* ─── 탭바 ─── */
+.top-tabs{
+  position:fixed;
+  top:calc(var(--top-h) + var(--st));
+  left:0;right:0;z-index:900;
+  background:#fff;border-bottom:1px solid var(--bdr);
+  display:flex;box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.top-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:var(--tab-h);font-size:14px;font-weight:600;color:var(--tx3);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+.top-tab.on{color:var(--primary);border-bottom-color:var(--primary);}
+.top-tab-icon{font-size:16px;}
+
+/* ─── 본문 ─── */
+.body-wrap{
+  position:fixed;
+  top:calc(var(--top-h) + var(--tab-h) + var(--st));
+  bottom:calc(var(--filter-btn-h) + var(--sb));
+  left:0;right:0;overflow:hidden;
+}
+
+/* ─── 지도 뷰 ─── */
+#map-view{width:100%;height:100%;display:none;position:relative;}
+#map-view.on{display:block;}
+#map{width:100%;height:100%;position:absolute;top:0;left:0;right:0;bottom:0;}
+
+/* 지역 칩 */
+.region-chip{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid var(--bdr);border-radius:20px;padding:7px 16px;font-size:12px;color:var(--tx2);z-index:500;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+.region-chip.on{background:var(--pl);color:var(--primary);border-color:#C4D4F8;font-weight:700;pointer-events:all;cursor:pointer;}
+
+/* 범례 */
+.map-legend{position:absolute;bottom:12px;right:10px;background:rgba(255,255,255,.95);border:1px solid var(--bdr);border-radius:var(--rs);padding:9px 12px;font-size:11px;z-index:500;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.leg-row{display:flex;align-items:center;gap:6px;color:var(--tx2);margin-bottom:4px;}
+.leg-row:last-child{margin-bottom:0;}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+/* ─── 목록 뷰 ─── */
+#list-view{width:100%;height:100%;display:none;flex-direction:column;overflow:hidden;}
+#list-view.on{display:flex;}
+.result-bar{flex-shrink:0;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--bdr);font-size:12px;color:var(--tx2);}
+.card-list{overflow-y:auto;flex:1;padding:12px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;}
+.fcard{background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:14px;cursor:pointer;}
+.fcard:active{transform:scale(.98);background:#F8FAFF;}
+.fcard.sel{border-color:var(--primary);box-shadow:0 0 0 2px rgba(45,107,228,.18);}
+.card-top{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.card-name{font-size:14px;font-weight:700;line-height:1.4;}
+.tbadge{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.ta{background:var(--act-bg);color:var(--act);}
+.tw{background:var(--wel-bg);color:var(--wel);}
+.to{background:var(--oth-bg);color:var(--oth);}
+.card-desc{font-size:13px;color:var(--tx2);margin-bottom:7px;line-height:1.55;}
+.card-info{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+.card-info-row{font-size:12px;color:var(--tx2);line-height:1.5;}
+.card-tel,.card-web{color:var(--primary);text-decoration:none;font-weight:500;}
+.card-web{word-break:break-all;}
+.card-tags{display:flex;flex-direction:column;gap:5px;}
+.card-tag-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.ctag-label{font-size:10px;font-weight:600;color:var(--tx3);letter-spacing:.3px;min-width:46px;}
+.ctag-target{font-size:11px;color:#166534;background:#F0FDF4;border:1px solid #BBF7D0;padding:3px 8px;border-radius:4px;font-weight:500;}
+.ctag-day{font-size:11px;color:#1A56DB;background:#EEF6FF;border:1px solid #BFDBFE;padding:3px 8px;border-radius:4px;font-weight:500;}
+.card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);}
+.card-reg{font-size:12px;color:var(--tx2);}
+.naver-btn{font-size:12px;color:#03C75A;font-weight:700;background:#F5FFF8;border:1px solid #BCEDCF;padding:6px 11px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;min-height:32px;}
+.no-res{text-align:center;padding:48px 20px;color:var(--tx3);}
+.no-res-icon{font-size:36px;margin-bottom:10px;}
+
+/* ─── 필터 버튼 바 ─── */
+.filter-btn-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:800;
+  padding-bottom:var(--sb);
+  height:calc(var(--filter-btn-h) + var(--sb));
+  background:#fff;border-top:1px solid var(--bdr);
+  display:flex;align-items:center;padding-left:16px;padding-right:16px;gap:8px;
+  box-shadow:0 -1px 4px rgba(0,0,0,.05);
+}
+.filter-toggle-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:32px;background:var(--bg);border:1px solid var(--bdr);border-radius:20px;font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer;transition:all .15s;}
+.filter-toggle-btn.has-filter{background:var(--pl);color:var(--primary);border-color:#C4D4F8;}
+.filter-arrow{font-size:10px;transition:transform .3s;}
+.filter-arrow.up{transform:rotate(180deg);}
+.filter-reset-btn{height:32px;padding:0 12px;background:none;border:1px solid var(--bdr);border-radius:20px;font-size:12px;color:var(--tx3);cursor:pointer;white-space:nowrap;}
+
+/* ─── 필터 드로어 ─── */
+.filter-drawer{
+  position:fixed;bottom:calc(var(--filter-btn-h) + var(--sb));
+  left:0;right:0;z-index:799;
+  background:#fff;border-top:2px solid var(--bdr);border-radius:16px 16px 0 0;
+  box-shadow:0 -4px 20px rgba(0,0,0,.12);
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.filter-drawer.open{transform:translateY(0);}
+.drawer-handle{width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:10px auto 0;}
+.drawer-inner{padding:12px 16px 16px;}
+.filter-group{margin-bottom:14px;}
+.filter-group:last-child{margin-bottom:0;}
+.fgroup-label{font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.6px;text-transform:uppercase;margin-bottom:7px;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{padding:6px 13px;border-radius:20px;font-size:13px;font-weight:500;border:1.5px solid var(--bdr);background:#fff;color:var(--tx2);cursor:pointer;white-space:nowrap;}
+.chip.a-act{background:var(--act-bg);color:var(--act);border-color:var(--act);}
+.chip.a-wel{background:var(--wel-bg);color:var(--wel);border-color:var(--wel);}
+.chip.a-oth{background:var(--oth-bg);color:var(--oth);border-color:var(--oth);}
+.chip.a-on{background:var(--pl);color:var(--primary);border-color:var(--primary);}
+
+/* ─── 카카오맵 커스텀 오버레이 ─── */
+.kakao-overlay{
+  position:relative;
+  background:#fff;
+  border-radius:12px;
+  box-shadow:0 4px 16px rgba(0,0,0,.2);
+  padding:14px 16px 14px;
+  width:min(82vw,300px);
+  font-family:'Noto Sans KR',sans-serif;
+}
+.kakao-overlay::after{
+  content:'';position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#fff;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.1));
+}
+.overlay-close{position:absolute;top:9px;right:9px;width:24px;height:24px;background:var(--bg);border:none;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--tx2);}
+.overlay-name{font-size:14px;font-weight:700;margin-bottom:4px;padding-right:20px;}
+.overlay-desc{font-size:12px;color:var(--tx2);margin-bottom:9px;line-height:1.6;}
+.overlay-row{display:flex;gap:6px;margin-bottom:4px;align-items:flex-start;}
+.overlay-lbl{font-size:11px;color:var(--tx3);min-width:46px;padding-top:1px;font-weight:600;}
+.overlay-val{font-size:11px;color:var(--tx);line-height:1.55;}
+.overlay-days{display:flex;flex-wrap:wrap;gap:3px;}
+.overlay-day{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;background:#EEF6FF;color:#1A56DB;border:1px solid #BFDBFE;}
+.overlay-target{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;}
+.overlay-tel{color:var(--primary);text-decoration:none;font-weight:500;}
+.overlay-link{color:var(--primary);text-decoration:none;font-weight:500;word-break:break-all;}
+.overlay-btns{display:flex;gap:6px;margin-top:10px;}
+.overlay-btn-naver{flex:1;background:#03C75A;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none;min-height:38px;}
+.overlay-btn-list{background:var(--pl);color:var(--primary);border:1px solid #C4D4F8;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:38px;}
+.overlay-header{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+
+/* ─── 모달 ─── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;z-index:2000;padding-bottom:var(--sb);}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.2);}
+.modal-handle{width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:12px auto 0;}
+.modal-hdr{padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;}
+.modal-close{background:none;border:1px solid var(--bdr);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--tx2);}
+
+/* About */
+.about-hero{background:linear-gradient(135deg,#0F2A5C,#1E4DB7 55%,#4B78E8);padding:26px 20px;color:#fff;text-align:center;}
+.about-badge{background:rgba(255,255,255,.2);display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;margin-bottom:10px;}
+.about-title{font-size:21px;font-weight:900;letter-spacing:-.4px;margin-bottom:6px;}
+.about-sub{font-size:13px;opacity:.85;line-height:1.7;}
+.about-body{padding:18px;}
+.about-sec{margin-bottom:20px;}
+.about-sec-title{font-size:14px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:7px;}
+.about-sec-title::before{content:'';display:block;width:3px;height:15px;background:var(--primary);border-radius:2px;}
+.about-txt{font-size:13px;color:var(--tx2);line-height:1.8;}
+.steps{display:flex;flex-direction:column;gap:9px;}
+.step{display:flex;gap:10px;align-items:flex-start;}
+.step-n{width:22px;height:22px;min-width:22px;background:var(--primary);color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+.step-t{font-size:13px;color:var(--tx2);line-height:1.7;}
+.type-tags{display:flex;flex-direction:column;gap:6px;}
+.type-tag{padding:8px 12px;border-radius:var(--rs);font-size:13px;font-weight:500;}
+.tt-b{background:var(--act-bg);color:#1A4DB7;}
+.tt-g{background:var(--wel-bg);color:#0A6E4A;}
+.tt-o{background:var(--oth-bg);color:#934E06;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.info-card{background:var(--bg);border-radius:var(--rs);padding:11px;}
+.info-lbl{font-size:10px;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
+.info-val{font-size:12px;font-weight:500;}
+.nfc-box{background:linear-gradient(135deg,#EBF1FD,#F0F5FF);border:1px solid #C4D4F8;border-radius:var(--r);padding:13px;display:flex;gap:11px;align-items:center;}
+.nfc-icon{font-size:26px;}
+.nfc-txt{font-size:12px;color:var(--tx2);line-height:1.75;}
+
+/* Admin */
+.admin-table{width:100%;border-collapse:collapse;font-size:13px;}
+.admin-table th{text-align:left;padding:9px 10px;font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr);background:var(--bg);}
+.admin-table td{padding:10px;border-bottom:1px solid var(--bdr);vertical-align:middle;}
+.admin-table tr:hover td{background:var(--bg);}
+.act-btn{padding:4px 9px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--bdr);background:#fff;}
+.ab-edit{color:var(--primary);border-color:var(--primary);}
+.ab-del{color:#E53E3E;border-color:#FEB2B2;}
+.add-form{margin-top:16px;background:var(--bg);border-radius:var(--r);padding:16px;border:1px dashed var(--bdr);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.form-field{display:flex;flex-direction:column;gap:4px;}
+.form-lbl{font-size:12px;font-weight:500;color:var(--tx2);}
+.form-inp{padding:9px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;background:#fff;color:var(--tx);}
+.form-inp:focus{outline:none;border-color:var(--primary);}
+.fcol2{grid-column:1/-1;}
+.btn-submit{background:var(--primary);color:#fff;border:none;border-radius:var(--rs);padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px;}
+.pw-wrap{padding:32px 18px;display:flex;flex-direction:column;align-items:center;gap:11px;}
+.pw-inp{padding:12px 14px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:15px;width:210px;text-align:center;letter-spacing:5px;}
+.pw-inp:focus{outline:none;border-color:var(--primary);}
+.pw-btn{background:var(--primary);color:#fff;border:none;border-radius:var(--rs);padding:12px 36px;font-size:14px;font-weight:700;cursor:pointer;min-height:46px;}
+.pw-err{color:#E53E3E;font-size:13px;display:none;}
+.cb-group{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;}
+.cb-item{display:flex;align-items:center;gap:0;}
+.cb-item input[type=checkbox]{display:none;}
+.cb-item label{display:flex;align-items:center;justify-content:center;padding:6px 13px;border-radius:20px;font-size:13px;font-weight:500;border:1.5px solid var(--bdr);background:#fff;color:var(--tx2);cursor:pointer;transition:all .15s;user-select:none;min-height:34px;}
+.cb-item input[type=checkbox]:checked + label{background:var(--pl);color:var(--primary);border-color:var(--primary);font-weight:700;}
+.cb-item.day input[type=checkbox]:checked + label{background:#EEF6FF;color:#1A56DB;border-color:#76A9FA;}
+.cb-item.target input[type=checkbox]:checked + label{background:#F0FDF4;color:#166534;border-color:#86EFAC;}
+
+/* 데스크탑 */
+@media(min-width:768px){
+  :root{--top-h:60px;--tab-h:0px;--filter-btn-h:0px;}
+  .top-tabs{display:none;}
+  .body-wrap{display:grid;grid-template-columns:320px 1fr;top:calc(var(--top-h) + var(--st));bottom:0;}
+  #map-view,#list-view{display:block!important;height:100%;}
+  #list-view{display:flex!important;border-right:1px solid var(--bdr);}
+  .filter-btn-bar{display:none;}
+  .filter-drawer{position:static;transform:none!important;border-radius:0;border-top:none;border-bottom:1px solid var(--bdr);box-shadow:none;max-height:none;overflow:visible;padding-bottom:0;}
+  .drawer-handle{display:none;}
+  #list-view .filter-drawer{order:-1;flex-shrink:0;}
+  .modal-overlay{align-items:center;}
+  .modal{border-radius:18px;max-width:640px;margin:auto;max-height:85vh;}
+  .modal-handle{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- 상단 헤더 -->
+<div class="top-header">
+  <div class="top-logo">
+    <div class="top-logo-icon">📍</div>
+    <div>
+      <div class="top-logo-text">강동구청소년MAP핑!</div>
+      <div class="top-logo-sub">강동구 청소년 시설 안내 지도</div>
+    </div>
+  </div>
+  <div class="top-btns">
+    <button class="top-btn accent" onclick="openAbout()">💡 소개</button>
+    <button class="top-btn" onclick="openAdmin()">🔧 관리자</button>
+  </div>
+</div>
+
+<!-- 탭 -->
+<div class="top-tabs">
+  <button class="top-tab on" id="ttab-map" onclick="switchTab('map')"><span class="top-tab-icon">🗺️</span> 지도</button>
+  <button class="top-tab" id="ttab-list" onclick="switchTab('list')"><span class="top-tab-icon">📋</span> 시설목록</button>
+</div>
+
+<!-- 본문 -->
+<div class="body-wrap">
+  <!-- 지도 뷰 -->
+  <div id="map-view" class="on">
+    <div id="map"></div>
+    <div class="region-chip" id="region-chip">🗺️ 행정동을 탭해서 지역 필터</div>
+    <div class="map-legend">
+      <div class="leg-row"><div class="leg-dot" style="background:#2D6BE4"></div>청소년활동</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#16A97B"></div>상담·복지</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#E8820C"></div>기타</div>
+    </div>
+  </div>
+  <!-- 목록 뷰 -->
+  <div id="list-view">
+    <div class="result-bar" id="result-bar">시설 0개 표시 중</div>
+    <div class="card-list" id="card-list"></div>
+  </div>
+</div>
+
+<!-- 필터 드로어 -->
+<div class="filter-drawer" id="filter-drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-inner">
+    <div class="filter-group">
+      <div class="fgroup-label">시설 유형</div>
+      <div class="chips">
+        <button class="chip a-act" data-f="type" data-v="all-type" onclick="setFilter('type','all-type')">전체</button>
+        <button class="chip" data-f="type" data-v="청소년활동" onclick="setFilter('type','청소년활동')">청소년활동</button>
+        <button class="chip" data-f="type" data-v="상담및복지" onclick="setFilter('type','상담및복지')">상담·복지</button>
+        <button class="chip" data-f="type" data-v="기타" onclick="setFilter('type','기타')">기타</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="fgroup-label">지역 (행정동)</div>
+      <div class="chips">
+        <button class="chip a-on" data-f="region" data-v="all-region" onclick="setFilter('region','all-region')">전체</button>
+        <button class="chip" data-f="region" data-v="강일동" onclick="setFilter('region','강일동')">강일동</button>
+        <button class="chip" data-f="region" data-v="고덕동" onclick="setFilter('region','고덕동')">고덕동</button>
+        <button class="chip" data-f="region" data-v="길동" onclick="setFilter('region','길동')">길동</button>
+        <button class="chip" data-f="region" data-v="둔촌동" onclick="setFilter('region','둔촌동')">둔촌동</button>
+        <button class="chip" data-f="region" data-v="명일동" onclick="setFilter('region','명일동')">명일동</button>
+        <button class="chip" data-f="region" data-v="상일동" onclick="setFilter('region','상일동')">상일동</button>
+        <button class="chip" data-f="region" data-v="성내동" onclick="setFilter('region','성내동')">성내동</button>
+        <button class="chip" data-f="region" data-v="암사동" onclick="setFilter('region','암사동')">암사동</button>
+        <button class="chip" data-f="region" data-v="천호동" onclick="setFilter('region','천호동')">천호동</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="fgroup-label">운영요일</div>
+      <div class="chips">
+        <button class="chip a-on" data-f="day" data-v="all-day" onclick="setFilter('day','all-day')">전체</button>
+        <button class="chip" data-f="day" data-v="월" onclick="setFilter('day','월')">월</button>
+        <button class="chip" data-f="day" data-v="화" onclick="setFilter('day','화')">화</button>
+        <button class="chip" data-f="day" data-v="수" onclick="setFilter('day','수')">수</button>
+        <button class="chip" data-f="day" data-v="목" onclick="setFilter('day','목')">목</button>
+        <button class="chip" data-f="day" data-v="금" onclick="setFilter('day','금')">금</button>
+        <button class="chip" data-f="day" data-v="토" onclick="setFilter('day','토')">토</button>
+        <button class="chip" data-f="day" data-v="일" onclick="setFilter('day','일')">일</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="fgroup-label">이용대상</div>
+      <div class="chips">
+        <button class="chip a-on" data-f="target" data-v="all-target" onclick="setFilter('target','all-target')">전체</button>
+        <button class="chip" data-f="target" data-v="초" onclick="setFilter('target','초')">초등학생</button>
+        <button class="chip" data-f="target" data-v="중" onclick="setFilter('target','중')">중학생</button>
+        <button class="chip" data-f="target" data-v="고" onclick="setFilter('target','고')">고등학생</button>
+        <button class="chip" data-f="target" data-v="후기청소년" onclick="setFilter('target','후기청소년')">후기청소년</button>
+        <button class="chip" data-f="target" data-v="학교밖청소년" onclick="setFilter('target','학교밖청소년')">학교밖청소년</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 필터 버튼 바 -->
+<div class="filter-btn-bar">
+  <button class="filter-toggle-btn" id="filter-toggle-btn" onclick="toggleDrawer()">
+    <span id="filter-btn-label">🔍 필터</span>
+    <span class="filter-arrow" id="filter-arrow">▲</span>
+  </button>
+  <button class="filter-reset-btn" id="filter-reset-btn" onclick="resetFilters()" style="display:none;">초기화</button>
+</div>
+
+<!-- MAP핑이란? 모달 -->
+<div class="modal-overlay" id="about-modal" onclick="if(event.target===this)closeAbout()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-title">💡 MAP핑이란?</div>
+      <button class="modal-close" onclick="closeAbout()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="about-hero">
+        <div class="about-badge">2026 강동구 청소년참여예산제</div>
+        <div class="about-title">강동구청소년MAP핑! 🗺️</div>
+        <div class="about-sub">강동구 청소년운영위원회가 직접 만드는<br>우리 동네 청소년 시설 안내 지도</div>
+      </div>
+      <div class="about-body">
+        <div class="about-sec">
+          <div class="about-sec-title">프로그램 소개</div>
+          <div class="about-txt">'강동구청소년MAP핑!'은 2026년 강동구 청소년참여예산제를 통해 <strong>청소년운영위원회</strong>가 직접 기획하고 운영하는 프로젝트예요.<br><br>강동구 청소년 시설을 청소년들이 직접 조사해서 한눈에 찾을 수 있는 지도로 만들었어요.</div>
+        </div>
+        <div class="about-sec">
+          <div class="about-sec-title">이렇게 진행했어요</div>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-t"><strong>시설 조사</strong> — 청소년운영위원회 위원들이 직접 발로 뛰며 조사했어요.</div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-t"><strong>지도 제작</strong> — 실제 지도 위에 핀으로 표시하고 필터로 쉽게 찾을 수 있게 만들었어요.</div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-t"><strong>NFC 키링 배포</strong> — 키링을 폰에 태그하면 이 지도가 바로 열려요!</div></div>
+            <div class="step"><div class="step-n">4</div><div class="step-t"><strong>지속 업데이트</strong> — 새 시설 정보를 계속 업데이트해요.</div></div>
+          </div>
+        </div>
+        <div class="about-sec">
+          <div class="about-sec-title">시설 유형</div>
+          <div class="type-tags">
+            <span class="type-tag tt-b">🏃 청소년활동 — 청소년문화의집, 수련관 등</span>
+            <span class="type-tag tt-g">💙 상담·복지 — 상담복지센터, Wee센터 등</span>
+            <span class="type-tag tt-o">📌 기타 — 진로체험, 자원봉사 센터 등</span>
+          </div>
+        </div>
+        <div class="about-sec">
+          <div class="about-sec-title">기본 정보</div>
+          <div class="info-grid">
+            <div class="info-card"><div class="info-lbl">주관</div><div class="info-val">강동구 청소년운영위원회</div></div>
+            <div class="info-card"><div class="info-lbl">예산</div><div class="info-val">2026 청소년참여예산제</div></div>
+            <div class="info-card"><div class="info-lbl">지역</div><div class="info-val">서울특별시 강동구</div></div>
+            <div class="info-card"><div class="info-lbl">운영방식</div><div class="info-val">온라인 지도 + NFC 키링</div></div>
+          </div>
+        </div>
+        <div class="about-sec">
+          <div class="about-sec-title">NFC 키링이 뭐예요?</div>
+          <div class="nfc-box">
+            <div class="nfc-icon">🔖</div>
+            <div class="nfc-txt">이 지도 링크가 내장된 실물 키링이에요.<br>스마트폰 뒷면에 살짝 갖다 대면<br><strong>자동으로 이 지도가 열려요!</strong></div>
+          </div>
+        </div>
+        <div style="padding-bottom:8px;">
+          <button class="btn-submit" onclick="closeAbout()" style="width:100%;padding:12px;font-size:14px;">지도 보러 가기 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 관리자 모달 -->
+<div class="modal-overlay" id="admin-modal">
+  <div class="modal" style="max-width:920px;">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-title">🔧 관리자</div>
+      <button class="modal-close" onclick="closeAdmin()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 18px;" id="admin-body"></div>
+  </div>
+</div>
+
+<script>
+// ==================== 데이터 ====================
+let facilities=[
+  {id:1,name:"강동구립 둔촌청소년문화의집",type:"청소년활동",address:"서울특별시 강동구 진황도로61길 25-23, 1층",region:"둔촌동",days:["화","수","목","금","토","일"],targets:["초","중","고","대","후기청소년","학교밖청소년"],desc:"당찬 청소년들의 공간, 당찬 둔촌청소년문화의집",phone:"02-6953-0931",website:"https://dcyouth.or.kr",naver:"https://naver.me/GxFx1",lat:37.5218,lng:127.1355},
+  {id:2,name:"강동구립 강일청소년문화의집",type:"청소년활동",address:"서울특별시 강동구 강일동 상암로 75",region:"강일동",days:["월","화","수","목","금","토"],targets:["초","중","고"],desc:"강일동 청소년들의 꿈을 키우는 공간",phone:"02-000-0002",website:"",naver:"https://naver.me/GxFx2",lat:37.5650,lng:127.1720},
+  {id:3,name:"강동구 청소년상담복지센터",type:"상담및복지",address:"서울특별시 강동구 천중로 46, 5층",region:"천호동",days:["월","화","수","목","금"],targets:["초","중","고","대","후기청소년","학교밖청소년"],desc:"청소년 고민, 언제든지 함께 해결해요",phone:"02-000-0003",website:"",naver:"https://naver.me/GxFx3",lat:37.5385,lng:127.1234},
+  {id:4,name:"강동구청소년수련관",type:"청소년활동",address:"서울특별시 강동구 상암로 181",region:"명일동",days:["월","화","수","목","금","토","일"],targets:["초","중","고"],desc:"다양한 청소년 수련 활동의 중심 공간",phone:"02-000-0004",website:"",naver:"https://naver.me/GxFx4",lat:37.5500,lng:127.1470},
+  {id:5,name:"강동 Wee센터",type:"상담및복지",address:"서울특별시 강동구 성내동 올림픽로 623",region:"성내동",days:["월","화","수","목","금"],targets:["초","중","고","학교밖청소년"],desc:"학교 안팎 청소년 심리·정서 지원",phone:"02-000-0005",website:"",naver:"https://naver.me/GxFx5",lat:37.5270,lng:127.1230},
+  {id:6,name:"강동구 청소년 진로직업체험센터",type:"기타",address:"서울특별시 강동구 길동 천중로 42길 10",region:"길동",days:["화","수","목","금","토"],targets:["중","고"],desc:"내 꿈을 직접 경험해보는 진로 탐색 공간",phone:"02-000-0006",website:"",naver:"https://naver.me/GxFx6",lat:37.5370,lng:127.1420},
+  {id:7,name:"암사청소년문화의집",type:"청소년활동",address:"서울특별시 강동구 암사동 선사로 87",region:"암사동",days:["화","수","목","금","토"],targets:["초","중","고"],desc:"역사와 문화를 품은 암사동 청소년 공간",phone:"02-000-0007",website:"",naver:"https://naver.me/GxFx7",lat:37.5480,lng:127.1290},
+];
+
+const RC={'강일동':[37.5650,127.1739],'상일동':[37.5502,127.1721],'고덕동':[37.5588,127.1580],'암사동':[37.5527,127.1335],'명일동':[37.5488,127.1478],'천호동':[37.5427,127.1307],'길동':[37.5345,127.1427],'성내동':[37.5296,127.1283],'둔촌동':[37.5333,127.1420]};
+
+let ADMIN_PW="1234",adminUnlocked=false,editingIdx=null;
+let filters={type:'all-type',region:'all-region',target:'all-target',day:'all-day'};
+let curTab='map',drawerOpen=false;
+let kakaoMap, markers=[], currentOverlay=null;
+
+// ==================== 탭 전환 ====================
+function switchTab(tab){
+  curTab=tab;
+  document.getElementById('map-view').classList.toggle('on',tab==='map');
+  document.getElementById('list-view').classList.toggle('on',tab==='list');
+  document.getElementById('ttab-map').classList.toggle('on',tab==='map');
+  document.getElementById('ttab-list').classList.toggle('on',tab==='list');
+  if(tab==='map'&&kakaoMap){
+    setTimeout(()=>kakaoMap.relayout(),100);
+  }
+}
+
+// ==================== 필터 드로어 ====================
+function toggleDrawer(){
+  drawerOpen=!drawerOpen;
+  document.getElementById('filter-drawer').classList.toggle('open',drawerOpen);
+  document.getElementById('filter-arrow').classList.toggle('up',drawerOpen);
+}
+function closeDrawer(){
+  drawerOpen=false;
+  document.getElementById('filter-drawer').classList.remove('open');
+  document.getElementById('filter-arrow').classList.remove('up');
+}
+
+// ==================== 필터 ====================
+function setFilter(key,val){
+  filters[key]=val;
+  document.querySelectorAll(`[data-f="${key}"]`).forEach(btn=>{
+    btn.className='chip';
+    if(btn.dataset.v===val){
+      if(key==='type'){
+        if(val==='청소년활동')btn.className='chip a-act';
+        else if(val==='상담및복지')btn.className='chip a-wel';
+        else if(val==='기타')btn.className='chip a-oth';
+        else btn.className='chip a-act';
+      } else btn.className='chip a-on';
+    }
+  });
+  updateFilterUI();
+  renderAll();
+}
+
+function resetFilters(){
+  const def={type:'all-type',region:'all-region',target:'all-target',day:'all-day'};
+  Object.keys(def).forEach(k=>{
+    filters[k]=def[k];
+    document.querySelectorAll(`[data-f="${k}"]`).forEach(btn=>{
+      btn.className='chip';
+      if(btn.dataset.v===def[k])btn.className=k==='type'?'chip a-act':'chip a-on';
+    });
+  });
+  updateFilterUI();
+  renderAll();
+}
+
+function hasActiveFilter(){
+  return filters.type!=='all-type'||filters.region!=='all-region'||filters.target!=='all-target'||filters.day!=='all-day';
+}
+
+function updateFilterUI(){
+  const active=hasActiveFilter();
+  const btn=document.getElementById('filter-toggle-btn');
+  const resetBtn=document.getElementById('filter-reset-btn');
+  if(active){
+    const parts=[];
+    if(filters.type!=='all-type')parts.push(filters.type==='청소년활동'?'청소년활동':filters.type==='상담및복지'?'상담·복지':'기타');
+    if(filters.region!=='all-region')parts.push('📍'+filters.region);
+    if(filters.day!=='all-day')parts.push(filters.day);
+    if(filters.target!=='all-target')parts.push(filters.target==='후기청소년'?'후기':filters.target==='학교밖청소년'?'학교밖':filters.target);
+    document.getElementById('filter-btn-label').textContent='🔍 '+parts.join(' · ');
+    btn.classList.add('has-filter');
+    resetBtn.style.display='block';
+  } else {
+    document.getElementById('filter-btn-label').textContent='🔍 필터';
+    btn.classList.remove('has-filter');
+    resetBtn.style.display='none';
+  }
+}
+
+function getFiltered(){
+  return facilities.filter(f=>{
+    const t=f.type.replace(/\s/g,'');
+    if(filters.type!=='all-type'&&t!==filters.type.replace(/\s/g,''))return false;
+    if(filters.region!=='all-region'&&f.region!==filters.region)return false;
+    if(filters.target!=='all-target'&&!f.targets.includes(filters.target))return false;
+    if(filters.day!=='all-day'&&!f.days.includes(filters.day))return false;
+    return true;
+  });
+}
+
+// ==================== 카카오맵 초기화 ====================
+function initMap(){
+  const container=document.getElementById('map');
+  const options={
+    center: new kakao.maps.LatLng(37.5450, 127.1400),
+    level: 5
+  };
+  kakaoMap=new kakao.maps.Map(container, options);
+
+  // 지도 클릭 시 드로어·오버레이 닫기
+  kakao.maps.event.addListener(kakaoMap,'click',()=>{
+    closeDrawer();
+    closeOverlay();
+  });
+
+  renderAll();
+}
+
+// ==================== 오버레이 ====================
+function getCol(type){
+  if(type==='청소년활동')return{color:'#2D6BE4',badge:'ta'};
+  if(type==='상담및복지')return{color:'#16A97B',badge:'tw'};
+  return{color:'#E8820C',badge:'to'};
+}
+
+function closeOverlay(){
+  if(currentOverlay){currentOverlay.setMap(null);currentOverlay=null;}
+}
+
+function showOverlay(f){
+  closeOverlay();
+  const col=getCol(f.type);
+  const tgt=f.targets.filter(t=>t!=='대').map(t=>t==='후기청소년'?'후기':t==='학교밖청소년'?'학교밖':t);
+  const content=`
+    <div class="kakao-overlay">
+      <button class="overlay-close" onclick="closeOverlay()">✕</button>
+      <div class="overlay-header">
+        <span class="tbadge ${col.badge}">${f.type}</span>
+        <span style="font-size:11px;color:var(--tx3);">📍 ${f.region}</span>
+      </div>
+      <div class="overlay-name">${f.name}</div>
+      <div class="overlay-desc">${f.desc}</div>
+      <div class="overlay-row"><span class="overlay-lbl">주소</span><span class="overlay-val">${f.address}</span></div>
+      ${f.phone?`<div class="overlay-row"><span class="overlay-lbl">연락처</span><a class="overlay-val overlay-tel" href="tel:${f.phone}">${f.phone}</a></div>`:''}
+      ${f.website?`<div class="overlay-row"><span class="overlay-lbl">공식링크</span><a class="overlay-val overlay-link" href="${f.website}" target="_blank">${f.website}</a></div>`:''}
+      <div class="overlay-row"><span class="overlay-lbl">운영요일</span><div class="overlay-days">${f.days.map(d=>`<span class="overlay-day">${d}</span>`).join('')}</div></div>
+      <div class="overlay-row"><span class="overlay-lbl">이용대상</span><div class="overlay-days">${tgt.map(t=>`<span class="overlay-target">${t}</span>`).join('')}</div></div>
+      <div class="overlay-btns">
+        <a class="overlay-btn-naver" href="${f.naver}" target="_blank">N 네이버 지도</a>
+        <button class="overlay-btn-list" onclick="goToList(${f.id})">목록보기</button>
+      </div>
+    </div>`;
+  currentOverlay=new kakao.maps.CustomOverlay({
+    position: new kakao.maps.LatLng(f.lat, f.lng),
+    content,
+    yAnchor: 1.3,
+    zIndex: 3
+  });
+  currentOverlay.setMap(kakaoMap);
+}
+
+// ==================== 렌더 ====================
+function renderAll(){
+  const filtered=getFiltered();
+  document.getElementById('result-bar').textContent=`시설 ${filtered.length}개 표시 중`;
+
+  // 지역 칩
+  const chip=document.getElementById('region-chip');
+  if(filters.region!=='all-region'){
+    chip.textContent=`📍 ${filters.region} — 탭해서 해제`;
+    chip.className='region-chip on';
+    chip.onclick=()=>setFilter('region','all-region');
+  } else {
+    chip.textContent='🗺️ 행정동을 탭해서 지역 필터';
+    chip.className='region-chip';
+    chip.onclick=null;
+  }
+
+  // 지도 이동
+  if(kakaoMap&&filters.region!=='all-region'){
+    const c=RC[filters.region];
+    if(c){
+      kakaoMap.setCenter(new kakao.maps.LatLng(c[0],c[1]));
+      kakaoMap.setLevel(4);
+    }
+  } else if(kakaoMap&&filters.region==='all-region'){
+    kakaoMap.setCenter(new kakao.maps.LatLng(37.5450,127.1400));
+    kakaoMap.setLevel(5);
+  }
+
+  renderCards(filtered);
+  renderMarkers(filtered);
+}
+
+function renderCards(list){
+  const c=document.getElementById('card-list');
+  if(!list.length){c.innerHTML=`<div class="no-res"><div class="no-res-icon">🔍</div><p>조건에 맞는 시설이 없어요</p></div>`;return;}
+  c.innerHTML=list.map(f=>{
+    const col=getCol(f.type);
+    return `<div class="fcard" id="card-${f.id}" onclick="selectFacility(${f.id})">
+      <div class="card-top"><div class="card-name">${f.name}</div><span class="tbadge ${col.badge}">${f.type}</span></div>
+      <div class="card-desc">${f.desc}</div>
+      <div class="card-info">
+        <div class="card-info-row">📍 ${f.address}</div>
+        ${f.phone?`<div class="card-info-row">📞 <a href="tel:${f.phone}" onclick="event.stopPropagation()" class="card-tel">${f.phone}</a></div>`:''}
+        ${f.website?`<div class="card-info-row">🔗 <a href="${f.website}" target="_blank" onclick="event.stopPropagation()" class="card-web">${f.website}</a></div>`:''}
+      </div>
+      <div class="card-tags">
+        <div class="card-tag-row"><span class="ctag-label">운영요일</span>${f.days.map(d=>`<span class="ctag-day">${d}</span>`).join('')}</div>
+        <div class="card-tag-row"><span class="ctag-label">이용대상</span>${f.targets.filter(t=>t!=='대').map(t=>t==='후기청소년'?'후기':t==='학교밖청소년'?'학교밖':t).map(t=>`<span class="ctag-target">${t}</span>`).join('')}</div>
+      </div>
+      <div class="card-foot">
+        <span class="card-reg">📍 ${f.region}</span>
+        <a class="naver-btn" href="${f.naver}" target="_blank" onclick="event.stopPropagation()">N 지도</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderMarkers(list){
+  if(!kakaoMap)return;
+  // 기존 마커 제거
+  markers.forEach(m=>m.setMap(null));
+  markers=[];
+  closeOverlay();
+
+  const vis=new Set(list.map(f=>f.id));
+  facilities.forEach(f=>{
+    const isV=vis.has(f.id);
+    const col=getCol(f.type);
+    const opacity=isV?1:0.2;
+
+    // 커스텀 마커 이미지
+    const markerEl=document.createElement('div');
+    markerEl.style.cssText=`width:36px;height:36px;background:${col.color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.28);opacity:${opacity};cursor:${isV?'pointer':'default'};`;
+
+    const overlay=new kakao.maps.CustomOverlay({
+      position: new kakao.maps.LatLng(f.lat,f.lng),
+      content: markerEl,
+      yAnchor: 1,
+      zIndex: isV?2:1
+    });
+    overlay.setMap(kakaoMap);
+
+    if(isV){
+      markerEl.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        highlightCard(f.id);
+        showOverlay(f);
+        closeDrawer();
+      });
+    }
+    markers.push(overlay);
+  });
+}
+
+function selectFacility(id){
+  const f=facilities.find(x=>x.id===id);if(!f)return;
+  highlightCard(id);
+  switchTab('map');
+  setTimeout(()=>{
+    kakaoMap.setCenter(new kakao.maps.LatLng(f.lat,f.lng));
+    kakaoMap.setLevel(3);
+    showOverlay(f);
+  },150);
+}
+
+function highlightCard(id){
+  document.querySelectorAll('.fcard').forEach(c=>c.classList.remove('sel'));
+  const card=document.getElementById('card-'+id);
+  if(card){card.classList.add('sel');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
+}
+
+function goToList(id){
+  closeOverlay();
+  switchTab('list');
+  setTimeout(()=>highlightCard(id),200);
+}
+
+// ==================== About ====================
+function openAbout(){document.getElementById('about-modal').classList.add('show');}
+function closeAbout(){document.getElementById('about-modal').classList.remove('show');}
+
+// ==================== 관리자 ====================
+function openAdmin(){document.getElementById('admin-modal').classList.add('show');if(!adminUnlocked)renderPw();else renderTable();}
+function closeAdmin(){document.getElementById('admin-modal').classList.remove('show');editingIdx=null;}
+
+function renderPw(){
+  document.getElementById('admin-body').innerHTML=`<div class="pw-wrap">
+    <div style="font-size:40px;">🔐</div>
+    <div style="font-size:17px;font-weight:700;">관리자 로그인</div>
+    <input class="pw-inp" type="password" id="pw-inp" placeholder="●●●●" onkeydown="if(event.key==='Enter')checkPw()"/>
+    <div class="pw-err" id="pw-err">비밀번호가 틀렸어요 🙅</div>
+    <button class="pw-btn" onclick="checkPw()">확인</button>
+    <div style="font-size:12px;color:var(--tx3);">테스트 비밀번호: 1234</div>
+  </div>`;
+}
+function checkPw(){
+  if(document.getElementById('pw-inp').value===ADMIN_PW){adminUnlocked=true;renderTable();}
+  else document.getElementById('pw-err').style.display='block';
+}
+function renderTable(){
+  const rows=facilities.map((f,i)=>`<tr>
+    <td>${f.name}</td>
+    <td><span class="tbadge ${getCol(f.type).badge}">${f.type}</span></td>
+    <td>${f.region}</td>
+    <td style="font-size:12px;">${f.days.join(', ')}</td>
+    <td style="font-size:12px;">${f.targets.filter(t=>t!=='대').map(t=>t==='후기청소년'?'후기':t==='학교밖청소년'?'학교밖':t).join(', ')}</td>
+    <td style="white-space:nowrap;">
+      <button class="act-btn ab-edit" onclick="editF(${i})">수정</button>
+      <button class="act-btn ab-del" onclick="delF(${i})" style="margin-left:4px;">삭제</button>
+    </td></tr>`).join('');
+  document.getElementById('admin-body').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:700;">시설 목록 (${facilities.length}개)</div>
+      <button class="btn-submit" style="padding:8px 16px;" onclick="showForm()">+ 추가</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="admin-table">
+        <thead><tr><th>시설명</th><th>유형</th><th>지역</th><th>운영요일</th><th>이용대상</th><th>관리</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div><div id="form-area"></div>`;
+}
+function showForm(pf){
+  const f=pf||{name:'',type:'청소년활동',address:'',region:'천호동',days:[],targets:[],desc:'',phone:'',website:'',naver:'',lat:37.5450,lng:127.1400};
+  const DAYS=['월','화','수','목','금','토','일'];
+  const TARGETS=['초','중','고','후기청소년','학교밖청소년'];
+  const dayHtml=DAYS.map(d=>`<div class="cb-item day"><input type="checkbox" id="fd-${d}" value="${d}" ${f.days.includes(d)?'checked':''}><label for="fd-${d}">${d}</label></div>`).join('');
+  const targetHtml=TARGETS.map(t=>{
+    const label=t==='초'?'초등학생':t==='중'?'중학생':t==='고'?'고등학생':t;
+    return `<div class="cb-item target"><input type="checkbox" id="fta-${t}" value="${t}" ${f.targets.includes(t)?'checked':''}><label for="fta-${t}">${label}</label></div>`;
+  }).join('');
+  document.getElementById('form-area').innerHTML=`<div class="add-form">
+    <div style="font-size:14px;font-weight:700;margin-bottom:13px;">${editingIdx!==null?'✏️ 수정':'➕ 신규 추가'}</div>
+    <div class="form-grid">
+      <div class="form-field"><label class="form-lbl">시설명 *</label><input class="form-inp" id="fn" value="${f.name}"/></div>
+      <div class="form-field"><label class="form-lbl">유형 *</label>
+        <select class="form-inp" id="ft">
+          <option ${f.type==='청소년활동'?'selected':''}>청소년활동</option>
+          <option ${f.type==='상담및복지'?'selected':''}>상담및복지</option>
+          <option ${f.type==='기타'?'selected':''}>기타</option>
+        </select></div>
+      <div class="form-field fcol2"><label class="form-lbl">주소</label><input class="form-inp" id="fa" value="${f.address}"/></div>
+      <div class="form-field fcol2"><label class="form-lbl">지역 *</label>
+        <select class="form-inp" id="fr">
+          ${['암사동','천호동','성내동','둔촌동','길동','명일동','고덕동','상일동','강일동'].map(r=>`<option ${f.region===r?'selected':''}>${r}</option>`).join('')}
+        </select></div>
+      <div class="form-field fcol2"><label class="form-lbl">운영요일 <span style="color:var(--tx3);font-weight:400;">(복수 선택 가능)</span></label><div class="cb-group">${dayHtml}</div></div>
+      <div class="form-field fcol2"><label class="form-lbl">이용대상 <span style="color:var(--tx3);font-weight:400;">(복수 선택 가능)</span></label><div class="cb-group">${targetHtml}</div></div>
+      <div class="form-field fcol2"><label class="form-lbl">한줄소개</label><input class="form-inp" id="fdesc" value="${f.desc}"/></div>
+      <div class="form-field"><label class="form-lbl">연락처</label><input class="form-inp" id="fphone" value="${f.phone||''}" placeholder="02-000-0000"/></div>
+      <div class="form-field"><label class="form-lbl">공식링크 URL</label><input class="form-inp" id="fweb" value="${f.website||''}" placeholder="https://"/></div>
+      <div class="form-field fcol2"><label class="form-lbl">네이버지도 URL</label><input class="form-inp" id="fnav" value="${f.naver}" placeholder="https://naver.me/..."/></div>
+      <div class="form-field"><label class="form-lbl">위도 *</label><input class="form-inp" id="flat" type="number" step="0.0001" value="${f.lat}"/></div>
+      <div class="form-field"><label class="form-lbl">경도 *</label><input class="form-inp" id="flng" type="number" step="0.0001" value="${f.lng}"/></div>
+    </div>
+    <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#795548;line-height:1.7;">
+      💡 네이버지도 URL의 @37.xxxx,127.xxxx에서 좌표를 복사하세요
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-submit" onclick="submitF()">${editingIdx!==null?'수정 완료':'추가하기'}</button>
+      <button class="act-btn" onclick="document.getElementById('form-area').innerHTML='';editingIdx=null;">취소</button>
+    </div>
+  </div>`;
+  document.getElementById('form-area').scrollIntoView({behavior:'smooth'});
+}
+function editF(i){editingIdx=i;showForm(facilities[i]);}
+function delF(i){
+  if(!confirm(`"${facilities[i].name}" 삭제할까요?`))return;
+  facilities.splice(i,1);renderTable();renderAll();
+}
+function submitF(){
+  const name=document.getElementById('fn').value.trim();
+  if(!name){alert('시설명을 입력해주세요');return;}
+  const lat=parseFloat(document.getElementById('flat').value);
+  const lng=parseFloat(document.getElementById('flng').value);
+  if(!lat||!lng){alert('위도/경도를 입력해주세요');return;}
+  const DAYS=['월','화','수','목','금','토','일'];
+  const TARGETS=['초','중','고','후기청소년','학교밖청소년'];
+  const days=DAYS.filter(d=>document.getElementById('fd-'+d)?.checked);
+  const targets=TARGETS.filter(t=>document.getElementById('fta-'+t)?.checked);
+  if(!days.length){alert('운영요일을 하나 이상 선택해주세요');return;}
+  if(!targets.length){alert('이용대상을 하나 이상 선택해주세요');return;}
+  let w=document.getElementById('fweb').value.trim();
+  if(w&&!w.startsWith('http'))w='https://'+w;
+  const nf={
+    id:editingIdx!==null?facilities[editingIdx].id:Date.now(),
+    name,type:document.getElementById('ft').value,
+    address:document.getElementById('fa').value.trim(),
+    region:document.getElementById('fr').value,
+    days,targets,
+    desc:document.getElementById('fdesc').value.trim(),
+    phone:document.getElementById('fphone').value.trim(),
+    website:w,
+    naver:document.getElementById('fnav').value.trim()||'#',
+    lat,lng
+  };
+  if(editingIdx!==null)facilities[editingIdx]=nf;else facilities.push(nf);
+  editingIdx=null;renderTable();renderAll();
+  alert(`"${nf.name}" ${editingIdx!==null?'수정':'추가'}되었습니다!`);
+}
+
+// ==================== 초기화 ====================
+window.addEventListener('load', initMap);
+</script>
+</body>
+</html>
