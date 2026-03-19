@@ -565,6 +565,7 @@ let facilities=[
   {id:5,name:"강동구아동청소년미래본부",type:"청소년활동",address:"서울특별시 강동구 성내동 13, 1층",region:"성내동",days:["화","수","목","금","토"],targets:["초","중","고"],desc:"강동구아동청소년미래본부",phone:"02-470-4415",website:"",lat:37.5304,lng:127.1225},
   {id:6,name:"강동중앙도서관",type:"기타",address:"서울특별시 강동구 양재대로84길 63",region:"둔촌동",days:["화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"강동중앙도서관-강동구립도서관",phone:"02-470-0423",website:"https://gdlibrary.or.kr",lat:37.5243505597151,lng:127.136965792517},
   {id:7,name:"강동여자단기청소년쉼터",type:"상담및복지",address:"서울특별시 강동구 구천면로24길 20-20",region:"천호동",days:["월","화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"강동여자단기청소년쉼터 더함",phone:"02-488-7961",website:"https://youthplus7961.or.kr",lat:37.5402449228609,lng:127.125032498643},
+  {id:8,name:"강동진로직업체험센터",type:"기타",address:"서울특별시 강동구 구천면로 395, 2층",region:"명일동",days:["월","화","수","목","금","토"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"꿈을 상상하면 팡팡 이루어진다 '상상팡팡'",phone:"02-481-7088",website:"https://blog.naver.com/edugd",lat:37.5510230174179,lng:127.142909546851},
 ];
 
 const RC={'강일동':[37.5650,127.1739],'상일동':[37.5502,127.1721],'고덕동':[37.5588,127.1580],'암사동':[37.5527,127.1335],'명일동':[37.5488,127.1478],'천호동':[37.5427,127.1307],'길동':[37.5345,127.1427],'성내동':[37.5296,127.1283],'둔촌동':[37.5333,127.1420]};
@@ -669,7 +670,7 @@ function initMap(){
   const container=document.getElementById('map');
   const options={
     center: new kakao.maps.LatLng(37.5450, 127.1400),
-    level: 5
+    level: 6
   };
   kakaoMap=new kakao.maps.Map(container, options);
 
@@ -803,41 +804,43 @@ function renderMarkers(list){
   Object.values(groups).forEach(group=>{
     const visGroup=group.filter(f=>vis.has(f.id));
     const hasVis=visGroup.length>0;
-    const isMulti=group.length>1;
-    const rep=group[0]; // 대표 시설 (첫번째)
+    // 실제로 겹치는 핀: 전체 시설이 2개 이상이면서 표시되는 시설도 2개 이상
+    const isMulti=visGroup.length>1;
+    const rep=group[0];
 
     const markerEl=document.createElement('div');
 
     if(isMulti){
-      // 클러스터 핀: 여러 시설이 있는 경우
-      const allVis=group.every(f=>vis.has(f.id));
-      const opacity=hasVis?1:0.2;
+      // 표시되는 시설 유형이 모두 같으면 그 색상, 다르면 검정
+      const types=new Set(visGroup.map(f=>f.type));
+      let pinColor='#1A202C'; // 기본 검정 (혼합)
+      if(types.size===1){
+        pinColor=getCol(visGroup[0].type).color; // 단일 유형이면 해당 색상
+      }
+
       markerEl.style.cssText=`
         width:44px;height:44px;
-        background:#1A202C;
+        background:${pinColor};
         border-radius:50% 50% 50% 0;
         transform:rotate(-45deg);
         border:3px solid white;
         box-shadow:0 3px 10px rgba(0,0,0,.35);
-        opacity:${opacity};
-        cursor:${hasVis?'pointer':'default'};
+        cursor:pointer;
         display:flex;align-items:center;justify-content:center;
       `;
       const label=document.createElement('span');
       label.style.cssText='transform:rotate(45deg);font-size:13px;font-weight:700;color:white;line-height:1;';
-      label.textContent='+'+group.length;
+      label.textContent='+'+visGroup.length;
       markerEl.appendChild(label);
 
-      if(hasVis){
-        markerEl.addEventListener('click',(e)=>{
-          e.stopPropagation();
-          // 여러 시설 순서대로 오버레이 표시
-          showMultiOverlay(visGroup);
-          closeDrawer();
-        });
-      }
+      markerEl.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        showMultiOverlay(visGroup);
+        closeDrawer();
+      });
+
     } else {
-      // 단일 핀
+      // 단일 핀 (visGroup이 1개이거나 0개)
       const f=group[0];
       const isV=vis.has(f.id);
       const col=getCol(f.type);
@@ -852,10 +855,12 @@ function renderMarkers(list){
         cursor:${isV?'pointer':'default'};
       `;
       if(isV){
+        // visGroup에서 실제 표시할 시설 찾기 (필터로 하나만 보일 때)
+        const target=visGroup.length>0?visGroup[0]:f;
         markerEl.addEventListener('click',(e)=>{
           e.stopPropagation();
-          highlightCard(f.id);
-          showSheet(f);
+          highlightCard(target.id);
+          showSheet(target);
           closeDrawer();
         });
       }
