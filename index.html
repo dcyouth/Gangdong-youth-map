@@ -109,7 +109,7 @@ button,input,select,a{font-family:inherit;}
 .ctag-day{font-size:11px;color:#1A56DB;background:#EEF6FF;border:1px solid #BFDBFE;padding:3px 8px;border-radius:4px;font-weight:500;}
 .card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--bdr);}
 .card-reg{font-size:12px;color:var(--tx2);}
-.naver-btn{font-size:12px;color:#03C75A;font-weight:700;background:#F5FFF8;border:1px solid #BCEDCF;padding:6px 11px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;min-height:32px;}
+.kakao-map-btn{font-size:12px;color:#3A1D96;font-weight:700;background:#FEE500;border:1px solid #F0D900;padding:6px 11px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px;min-height:32px;}
 .no-res{text-align:center;padding:48px 20px;color:var(--tx3);}
 .no-res-icon{font-size:36px;margin-bottom:10px;}
 
@@ -177,7 +177,7 @@ button,input,select,a{font-family:inherit;}
 .overlay-tel{color:var(--primary);text-decoration:none;font-weight:500;}
 .overlay-link{color:var(--primary);text-decoration:none;font-weight:500;word-break:break-all;}
 .overlay-btns{display:flex;gap:6px;margin-top:10px;}
-.overlay-btn-naver{flex:1;background:#03C75A;color:#fff;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none;min-height:38px;}
+.overlay-btn-kakao{flex:1;background:#FEE500;color:#3A1D96;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none;min-height:38px;}
 .overlay-btn-list{background:var(--pl);color:var(--primary);border:1px solid #C4D4F8;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:38px;}
 .overlay-header{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
 
@@ -252,12 +252,21 @@ button,input,select,a{font-family:inherit;}
   :root{--top-h:60px;--tab-h:0px;--filter-btn-h:0px;}
   .top-tabs{display:none;}
   .body-wrap{display:grid;grid-template-columns:320px 1fr;top:calc(var(--top-h) + var(--st));bottom:0;}
-  #map-view,#list-view{display:block!important;height:100%;}
-  #list-view{display:flex!important;border-right:1px solid var(--bdr);}
+  #map-view{display:block!important;height:100%;}
+  #list-view{display:flex!important;height:100%;border-right:1px solid var(--bdr);flex-direction:column;}
   .filter-btn-bar{display:none;}
-  .filter-drawer{position:static;transform:none!important;border-radius:0;border-top:none;border-bottom:1px solid var(--bdr);box-shadow:none;max-height:none;overflow:visible;padding-bottom:0;}
+  .filter-drawer{
+    position:static!important;
+    transform:none!important;
+    border-radius:0;
+    border-top:none;
+    border-bottom:1px solid var(--bdr);
+    box-shadow:none;
+    max-height:none;
+    overflow-y:auto;
+    flex-shrink:0;
+  }
   .drawer-handle{display:none;}
-  #list-view .filter-drawer{order:-1;flex-shrink:0;}
   .modal-overlay{align-items:center;}
   .modal{border-radius:18px;max-width:640px;margin:auto;max-height:85vh;}
   .modal-handle{display:none;}
@@ -301,67 +310,66 @@ button,input,select,a{font-family:inherit;}
   </div>
   <!-- 목록 뷰 -->
   <div id="list-view">
+    <!-- 필터 드로어 (데스크탑에서 목록 상단에 인라인 표시) -->
+    <div class="filter-drawer" id="filter-drawer">
+      <div class="drawer-handle"></div>
+      <div class="drawer-inner">
+        <div class="filter-group">
+          <div class="fgroup-label">시설 유형</div>
+          <div class="chips">
+            <button class="chip a-act" data-f="type" data-v="all-type" onclick="setFilter('type','all-type')">전체</button>
+            <button class="chip" data-f="type" data-v="청소년활동" onclick="setFilter('type','청소년활동')">청소년활동</button>
+            <button class="chip" data-f="type" data-v="상담및복지" onclick="setFilter('type','상담및복지')">상담·복지</button>
+            <button class="chip" data-f="type" data-v="기타" onclick="setFilter('type','기타')">기타</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="fgroup-label">지역 (행정동)</div>
+          <div class="chips">
+            <button class="chip a-on" data-f="region" data-v="all-region" onclick="setFilter('region','all-region')">전체</button>
+            <button class="chip" data-f="region" data-v="강일동" onclick="setFilter('region','강일동')">강일동</button>
+            <button class="chip" data-f="region" data-v="고덕동" onclick="setFilter('region','고덕동')">고덕동</button>
+            <button class="chip" data-f="region" data-v="길동" onclick="setFilter('region','길동')">길동</button>
+            <button class="chip" data-f="region" data-v="둔촌동" onclick="setFilter('region','둔촌동')">둔촌동</button>
+            <button class="chip" data-f="region" data-v="명일동" onclick="setFilter('region','명일동')">명일동</button>
+            <button class="chip" data-f="region" data-v="상일동" onclick="setFilter('region','상일동')">상일동</button>
+            <button class="chip" data-f="region" data-v="성내동" onclick="setFilter('region','성내동')">성내동</button>
+            <button class="chip" data-f="region" data-v="암사동" onclick="setFilter('region','암사동')">암사동</button>
+            <button class="chip" data-f="region" data-v="천호동" onclick="setFilter('region','천호동')">천호동</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="fgroup-label">운영요일</div>
+          <div class="chips">
+            <button class="chip a-on" data-f="day" data-v="all-day" onclick="setFilter('day','all-day')">전체</button>
+            <button class="chip" data-f="day" data-v="월" onclick="setFilter('day','월')">월</button>
+            <button class="chip" data-f="day" data-v="화" onclick="setFilter('day','화')">화</button>
+            <button class="chip" data-f="day" data-v="수" onclick="setFilter('day','수')">수</button>
+            <button class="chip" data-f="day" data-v="목" onclick="setFilter('day','목')">목</button>
+            <button class="chip" data-f="day" data-v="금" onclick="setFilter('day','금')">금</button>
+            <button class="chip" data-f="day" data-v="토" onclick="setFilter('day','토')">토</button>
+            <button class="chip" data-f="day" data-v="일" onclick="setFilter('day','일')">일</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="fgroup-label">이용대상</div>
+          <div class="chips">
+            <button class="chip a-on" data-f="target" data-v="all-target" onclick="setFilter('target','all-target')">전체</button>
+            <button class="chip" data-f="target" data-v="초" onclick="setFilter('target','초')">초등학생</button>
+            <button class="chip" data-f="target" data-v="중" onclick="setFilter('target','중')">중학생</button>
+            <button class="chip" data-f="target" data-v="고" onclick="setFilter('target','고')">고등학생</button>
+            <button class="chip" data-f="target" data-v="후기청소년" onclick="setFilter('target','후기청소년')">후기청소년</button>
+            <button class="chip" data-f="target" data-v="학교밖청소년" onclick="setFilter('target','학교밖청소년')">학교밖청소년</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="result-bar" id="result-bar">시설 0개 표시 중</div>
     <div class="card-list" id="card-list"></div>
   </div>
 </div>
 
-<!-- 필터 드로어 -->
-<div class="filter-drawer" id="filter-drawer">
-  <div class="drawer-handle"></div>
-  <div class="drawer-inner">
-    <div class="filter-group">
-      <div class="fgroup-label">시설 유형</div>
-      <div class="chips">
-        <button class="chip a-act" data-f="type" data-v="all-type" onclick="setFilter('type','all-type')">전체</button>
-        <button class="chip" data-f="type" data-v="청소년활동" onclick="setFilter('type','청소년활동')">청소년활동</button>
-        <button class="chip" data-f="type" data-v="상담및복지" onclick="setFilter('type','상담및복지')">상담·복지</button>
-        <button class="chip" data-f="type" data-v="기타" onclick="setFilter('type','기타')">기타</button>
-      </div>
-    </div>
-    <div class="filter-group">
-      <div class="fgroup-label">지역 (행정동)</div>
-      <div class="chips">
-        <button class="chip a-on" data-f="region" data-v="all-region" onclick="setFilter('region','all-region')">전체</button>
-        <button class="chip" data-f="region" data-v="강일동" onclick="setFilter('region','강일동')">강일동</button>
-        <button class="chip" data-f="region" data-v="고덕동" onclick="setFilter('region','고덕동')">고덕동</button>
-        <button class="chip" data-f="region" data-v="길동" onclick="setFilter('region','길동')">길동</button>
-        <button class="chip" data-f="region" data-v="둔촌동" onclick="setFilter('region','둔촌동')">둔촌동</button>
-        <button class="chip" data-f="region" data-v="명일동" onclick="setFilter('region','명일동')">명일동</button>
-        <button class="chip" data-f="region" data-v="상일동" onclick="setFilter('region','상일동')">상일동</button>
-        <button class="chip" data-f="region" data-v="성내동" onclick="setFilter('region','성내동')">성내동</button>
-        <button class="chip" data-f="region" data-v="암사동" onclick="setFilter('region','암사동')">암사동</button>
-        <button class="chip" data-f="region" data-v="천호동" onclick="setFilter('region','천호동')">천호동</button>
-      </div>
-    </div>
-    <div class="filter-group">
-      <div class="fgroup-label">운영요일</div>
-      <div class="chips">
-        <button class="chip a-on" data-f="day" data-v="all-day" onclick="setFilter('day','all-day')">전체</button>
-        <button class="chip" data-f="day" data-v="월" onclick="setFilter('day','월')">월</button>
-        <button class="chip" data-f="day" data-v="화" onclick="setFilter('day','화')">화</button>
-        <button class="chip" data-f="day" data-v="수" onclick="setFilter('day','수')">수</button>
-        <button class="chip" data-f="day" data-v="목" onclick="setFilter('day','목')">목</button>
-        <button class="chip" data-f="day" data-v="금" onclick="setFilter('day','금')">금</button>
-        <button class="chip" data-f="day" data-v="토" onclick="setFilter('day','토')">토</button>
-        <button class="chip" data-f="day" data-v="일" onclick="setFilter('day','일')">일</button>
-      </div>
-    </div>
-    <div class="filter-group">
-      <div class="fgroup-label">이용대상</div>
-      <div class="chips">
-        <button class="chip a-on" data-f="target" data-v="all-target" onclick="setFilter('target','all-target')">전체</button>
-        <button class="chip" data-f="target" data-v="초" onclick="setFilter('target','초')">초등학생</button>
-        <button class="chip" data-f="target" data-v="중" onclick="setFilter('target','중')">중학생</button>
-        <button class="chip" data-f="target" data-v="고" onclick="setFilter('target','고')">고등학생</button>
-        <button class="chip" data-f="target" data-v="후기청소년" onclick="setFilter('target','후기청소년')">후기청소년</button>
-        <button class="chip" data-f="target" data-v="학교밖청소년" onclick="setFilter('target','학교밖청소년')">학교밖청소년</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 필터 버튼 바 -->
+<!-- 필터 버튼 바 (모바일용) -->
 <div class="filter-btn-bar">
   <button class="filter-toggle-btn" id="filter-toggle-btn" onclick="toggleDrawer()">
     <span id="filter-btn-label">🔍 필터</span>
@@ -570,7 +578,9 @@ function initMap(){
 }
 
 // ==================== 오버레이 ====================
-function getCol(type){
+function kakaoMapUrl(f){
+  return `https://map.kakao.com/link/map/${encodeURIComponent(f.name)},${f.lat},${f.lng}`;
+}
   if(type==='청소년활동')return{color:'#2D6BE4',badge:'ta'};
   if(type==='상담및복지')return{color:'#16A97B',badge:'tw'};
   return{color:'#E8820C',badge:'to'};
@@ -599,7 +609,7 @@ function showOverlay(f){
       <div class="overlay-row"><span class="overlay-lbl">운영요일</span><div class="overlay-days">${f.days.map(d=>`<span class="overlay-day">${d}</span>`).join('')}</div></div>
       <div class="overlay-row"><span class="overlay-lbl">이용대상</span><div class="overlay-days">${tgt.map(t=>`<span class="overlay-target">${t}</span>`).join('')}</div></div>
       <div class="overlay-btns">
-        <a class="overlay-btn-naver" href="${f.naver}" target="_blank">N 네이버 지도</a>
+        <a class="overlay-btn-kakao" href="${kakaoMapUrl(f)}" target="_blank">카카오맵에서 보기</a>
         <button class="overlay-btn-list" onclick="goToList(${f.id})">목록보기</button>
       </div>
     </div>`;
@@ -664,7 +674,7 @@ function renderCards(list){
       </div>
       <div class="card-foot">
         <span class="card-reg">📍 ${f.region}</span>
-        <a class="naver-btn" href="${f.naver}" target="_blank" onclick="event.stopPropagation()">N 지도</a>
+        <a class="kakao-map-btn" href="${kakaoMapUrl(f)}" target="_blank" onclick="event.stopPropagation()">카카오맵</a>
       </div>
     </div>`;
   }).join('');
@@ -776,7 +786,7 @@ function renderTable(){
     </div><div id="form-area"></div>`;
 }
 function showForm(pf){
-  const f=pf||{name:'',type:'청소년활동',address:'',region:'천호동',days:[],targets:[],desc:'',phone:'',website:'',naver:'',lat:37.5450,lng:127.1400};
+  const f=pf||{name:'',type:'청소년활동',address:'',region:'천호동',days:[],targets:[],desc:'',phone:'',website:'',lat:37.5450,lng:127.1400};
   const DAYS=['월','화','수','목','금','토','일'];
   const TARGETS=['초','중','고','후기청소년','학교밖청소년'];
   const dayHtml=DAYS.map(d=>`<div class="cb-item day"><input type="checkbox" id="fd-${d}" value="${d}" ${f.days.includes(d)?'checked':''}><label for="fd-${d}">${d}</label></div>`).join('');
@@ -804,7 +814,6 @@ function showForm(pf){
       <div class="form-field fcol2"><label class="form-lbl">한줄소개</label><input class="form-inp" id="fdesc" value="${f.desc}"/></div>
       <div class="form-field"><label class="form-lbl">연락처</label><input class="form-inp" id="fphone" value="${f.phone||''}" placeholder="02-000-0000"/></div>
       <div class="form-field"><label class="form-lbl">공식링크 URL</label><input class="form-inp" id="fweb" value="${f.website||''}" placeholder="https://"/></div>
-      <div class="form-field fcol2"><label class="form-lbl">네이버지도 URL</label><input class="form-inp" id="fnav" value="${f.naver}" placeholder="https://naver.me/..."/></div>
       <div class="form-field"><label class="form-lbl">위도 *</label><input class="form-inp" id="flat" type="number" step="0.0001" value="${f.lat}"/></div>
       <div class="form-field"><label class="form-lbl">경도 *</label><input class="form-inp" id="flng" type="number" step="0.0001" value="${f.lng}"/></div>
     </div>
@@ -846,7 +855,7 @@ function submitF(){
     desc:document.getElementById('fdesc').value.trim(),
     phone:document.getElementById('fphone').value.trim(),
     website:w,
-    naver:document.getElementById('fnav').value.trim()||'#',
+    naver:document.getElementById('fnav')?.value.trim()||'',
     lat,lng
   };
   if(editingIdx!==null)facilities[editingIdx]=nf;else facilities.push(nf);
