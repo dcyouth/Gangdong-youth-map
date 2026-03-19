@@ -537,9 +537,11 @@ button,input,select,a{font-family:inherit;}
         </div>
         <div class="about-sec">
           <div class="about-sec-title">📋 업데이트 내역</div>
-          <div id="about-release-notes" style="font-size:13px;color:var(--tx2);line-height:2;">
+          <div id="about-release-notes-preview" style="font-size:13px;color:var(--tx2);">
             <div style="color:var(--tx3);font-size:12px;">아직 업데이트 내역이 없어요.</div>
           </div>
+          <div id="about-release-notes-more" style="display:none;font-size:13px;color:var(--tx2);"></div>
+          <button id="about-release-toggle" onclick="toggleAboutRelease()" style="display:none;width:100%;margin-top:8px;padding:7px;background:#F5F7FA;border:1px solid var(--bdr);border-radius:8px;font-size:12px;color:var(--tx2);font-weight:600;cursor:pointer;text-align:center;">펼치기 ▼</button>
         </div>
         <div style="padding-bottom:8px;">
           <button class="btn-submit" onclick="closeAbout()" style="width:100%;padding:12px;font-size:14px;">지도 보러 가기 →</button>
@@ -1030,11 +1032,11 @@ function addRelease(){
   const content = document.getElementById('rn-content').value.trim();
   const memo    = document.getElementById('rn-memo').value.trim();
   if(!content){alert('내용을 입력해주세요!');return;}
+  releasePage = 1; // 추가 후 첫 페이지로
   releaseNotes.unshift({type, date, content, memo});
   saveReleaseNotes();
   renderAboutReleaseNotes();
-  document.getElementById('release-form-area').innerHTML='';
-  document.getElementById('release-list-area').innerHTML=renderReleaseList();
+  renderTable();
 }
 
 function deleteRelease(i){
@@ -1042,25 +1044,61 @@ function deleteRelease(i){
   releaseNotes.splice(i,1);
   saveReleaseNotes();
   renderAboutReleaseNotes();
-  document.getElementById('release-list-area').innerHTML=renderReleaseList();
+  renderTable();
 }
 
-// 소개 모달 - 비고 없이 공개 항목만 표시
+// 소개 모달 - 최근 3개 미리보기 + 접기/펼치기 (비고 숨김)
+let aboutExpanded = false;
+function toggleAboutRelease(){
+  aboutExpanded = !aboutExpanded;
+  const btn = document.getElementById('about-release-toggle');
+  const more = document.getElementById('about-release-notes-more');
+  if(aboutExpanded){
+    more.style.display='block';
+    btn.textContent='접기 ▲';
+  } else {
+    more.style.display='none';
+    btn.textContent='펼치기 ▼';
+  }
+}
+
 function renderAboutReleaseNotes(){
-  const el = document.getElementById('about-release-notes');
-  if(!el) return;
+  const preview = document.getElementById('about-release-notes-preview');
+  const more    = document.getElementById('about-release-notes-more');
+  const btn     = document.getElementById('about-release-toggle');
+  if(!preview) return;
+
   if(!releaseNotes.length){
-    el.innerHTML='<div style="color:var(--tx3);font-size:12px;">아직 업데이트 내역이 없어요.</div>';
+    preview.innerHTML='<div style="color:var(--tx3);font-size:12px;">아직 업데이트 내역이 없어요.</div>';
+    if(more) more.innerHTML='';
+    if(btn)  btn.style.display='none';
     return;
   }
-  el.innerHTML = releaseNotes.map(n=>`
+
+  const makeItem = n => `
     <div style="padding:6px 0;border-bottom:1px solid var(--bdr);">
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:2px;">
         ${rnTagBadge(n.type)}
         <span style="font-size:11px;color:var(--tx3);">${n.date}</span>
       </div>
       <div style="font-size:13px;color:var(--tx1);">${n.content}</div>
-    </div>`).join('');
+    </div>`;
+
+  const PREVIEW_COUNT = 3;
+  preview.innerHTML = releaseNotes.slice(0, PREVIEW_COUNT).map(makeItem).join('');
+
+  if(releaseNotes.length > PREVIEW_COUNT){
+    if(more) more.innerHTML = releaseNotes.slice(PREVIEW_COUNT).map(makeItem).join('');
+    if(btn){
+      btn.style.display='block';
+      // 상태 유지
+      if(aboutExpanded){ more.style.display='block'; btn.textContent='접기 ▲'; }
+      else              { more.style.display='none';  btn.textContent='펼치기 ▼'; }
+    }
+  } else {
+    if(more) more.innerHTML='';
+    if(btn)  btn.style.display='none';
+  }
 }
 
 // ==================== About ====================
@@ -1088,17 +1126,55 @@ function checkPw(){
   if(document.getElementById('pw-inp').value===ADMIN_PW){adminUnlocked=true;renderTable();}
   else document.getElementById('pw-err').style.display='block';
 }
+// ==================== 관리자 페이지네이션 ====================
+let facilityPage = 1;
+const FACILITY_PER_PAGE = 10;
+let releasePage = 1;
+const RELEASE_PER_PAGE = 10;
+
+function paginator(cur, total, onClickFn){
+  if(total<=1) return '';
+  let btns='';
+  for(let i=1;i<=total;i++){
+    btns+=`<button onclick="${onClickFn}(${i})" style="
+      min-width:30px;height:30px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;
+      background:${i===cur?'var(--primary)':'#F3F4F6'};
+      color:${i===cur?'#fff':'var(--tx2)'};
+      border:${i===cur?'none':'1px solid var(--bdr)'};
+    ">${i}</button>`;
+  }
+  return `<div style="display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap;">
+    <button onclick="${onClickFn}(${Math.max(1,cur-1)})" style="min-width:30px;height:30px;padding:0 8px;border-radius:6px;font-size:12px;cursor:pointer;background:#F3F4F6;border:1px solid var(--bdr);color:var(--tx2);" ${cur===1?'disabled':''}>‹</button>
+    ${btns}
+    <button onclick="${onClickFn}(${Math.min(total,cur+1)})" style="min-width:30px;height:30px;padding:0 8px;border-radius:6px;font-size:12px;cursor:pointer;background:#F3F4F6;border:1px solid var(--bdr);color:var(--tx2);" ${cur===total?'disabled':''}>›</button>
+  </div>`;
+}
+
 function renderTable(){
-  const rows=facilities.map((f,i)=>`<tr>
-    <td>${f.name}</td>
-    <td><span class="tbadge ${getCol(f.type).badge}">${f.type}</span></td>
-    <td>${f.region}</td>
-    <td style="font-size:12px;">${f.days.join(', ')}</td>
-    <td style="font-size:12px;">${f.targets.filter(t=>t!=='대').map(t=>t==='후기청소년'?'후기':t==='학교밖청소년'?'학교밖':t).join(', ')}</td>
-    <td style="white-space:nowrap;">
-      <button class="act-btn ab-edit" onclick="editF(${i})">수정</button>
-      <button class="act-btn ab-del" onclick="delF(${i})" style="margin-left:4px;">삭제</button>
-    </td></tr>`).join('');
+  const totalFPages = Math.ceil(facilities.length/FACILITY_PER_PAGE);
+  facilityPage = Math.min(facilityPage, totalFPages||1);
+  const pageItems = facilities.slice((facilityPage-1)*FACILITY_PER_PAGE, facilityPage*FACILITY_PER_PAGE);
+  const startIdx  = (facilityPage-1)*FACILITY_PER_PAGE;
+
+  const rows = pageItems.map((f,pi)=>{
+    const i = startIdx+pi;
+    return `<tr>
+      <td>${f.name}</td>
+      <td><span class="tbadge ${getCol(f.type).badge}">${f.type}</span></td>
+      <td>${f.region}</td>
+      <td style="font-size:12px;">${f.days.join(', ')}</td>
+      <td style="font-size:12px;">${f.targets.filter(t=>t!=='대').map(t=>t==='후기청소년'?'후기':t==='학교밖청소년'?'학교밖':t).join(', ')}</td>
+      <td style="white-space:nowrap;">
+        <button class="act-btn ab-edit" onclick="editF(${i})">수정</button>
+        <button class="act-btn ab-del" onclick="delF(${i})" style="margin-left:4px;">삭제</button>
+      </td></tr>`;
+  }).join('');
+
+  const totalRPages = Math.ceil(releaseNotes.length/RELEASE_PER_PAGE);
+  releasePage = Math.min(releasePage, totalRPages||1);
+  const releaseItems = releaseNotes.slice((releasePage-1)*RELEASE_PER_PAGE, releasePage*RELEASE_PER_PAGE);
+  const releaseStartIdx = (releasePage-1)*RELEASE_PER_PAGE;
+
   document.getElementById('admin-body').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-size:14px;font-weight:700;">시설 목록 (${facilities.length}개)</div>
@@ -1110,6 +1186,7 @@ function renderTable(){
         <tbody>${rows}</tbody>
       </table>
     </div>
+    ${paginator(facilityPage, totalFPages, 'goFacilityPage')}
     <div id="form-area"></div>
     <div style="margin-top:24px;border-top:1px solid var(--bdr);padding-top:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1117,9 +1194,37 @@ function renderTable(){
         <button class="btn-submit" style="padding:7px 14px;font-size:12px;" onclick="showReleaseForm()">+ 추가</button>
       </div>
       <div id="release-form-area"></div>
-      <div id="release-list-area">${renderReleaseList()}</div>
+      <div id="release-list-area">${renderReleaseListPage(releaseItems, releaseStartIdx)}</div>
+      ${paginator(releasePage, totalRPages, 'goReleasePage')}
     </div>`;
 }
+
+function goFacilityPage(p){ facilityPage=p; renderTable(); }
+function goReleasePage(p){ releasePage=p; renderTable(); }
+
+function renderReleaseListPage(items, startIdx){
+  if(!releaseNotes.length) return '<div style="font-size:12px;color:var(--tx3);padding:6px 0;">아직 작성된 내역이 없어요.</div>';
+  return items.map((n,pi)=>{
+    const i = startIdx+pi;
+    return `
+    <div style="padding:10px 0;border-bottom:1px solid var(--bdr);">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+            ${rnTagBadge(n.type)}
+            <span style="font-size:12px;color:var(--tx3);">${n.date}</span>
+          </div>
+          <div style="font-size:13px;color:var(--tx1);margin-bottom:${n.memo?'4px':'0'}">${n.content}</div>
+          ${n.memo?`<div style="font-size:11px;color:var(--tx3);background:#F9FAFB;padding:4px 8px;border-radius:5px;margin-top:3px;">📝 ${n.memo}</div>`:''}
+        </div>
+        <button onclick="deleteRelease(${i})" style="background:none;border:none;color:var(--tx3);font-size:14px;cursor:pointer;padding:0 4px;flex-shrink:0;">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 기존 renderReleaseList는 renderTable 내부에서 대체됨 (하위호환 유지)
+function renderReleaseList(){ return renderReleaseListPage(releaseNotes, 0); }
 function showForm(pf){
   const f=pf||{name:'',type:'청소년활동',address:'',region:'천호동',days:[],targets:[],desc:'',phone:'',website:'',lat:37.5450,lng:127.1400};
   const DAYS=['월','화','수','목','금','토','일'];
