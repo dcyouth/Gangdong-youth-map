@@ -150,7 +150,36 @@ button,input,select,a{font-family:inherit;}
 .chip.a-oth{background:var(--oth-bg);color:var(--oth);border-color:var(--oth);}
 .chip.a-on{background:var(--pl);color:var(--primary);border-color:var(--primary);}
 
-/* ─── 카카오맵 커스텀 오버레이 ─── */
+/* ─── 지도 기관 바텀시트 ─── */
+.map-sheet-bg{
+  display:none;position:absolute;inset:0;background:rgba(0,0,0,.3);z-index:600;
+}
+.map-sheet-bg.on{display:block;}
+.map-sheet{
+  position:absolute;bottom:0;left:0;right:0;z-index:601;
+  background:#fff;border-radius:16px 16px 0 0;
+  box-shadow:0 -4px 20px rgba(0,0,0,.15);
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  max-height:75%;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.map-sheet.on{transform:translateY(0);}
+.map-sheet-handle{width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:10px auto 0;}
+.map-sheet-body{padding:12px 16px 20px;}
+.sheet-header{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.sheet-name{font-size:15px;font-weight:700;margin-bottom:4px;}
+.sheet-desc{font-size:13px;color:var(--tx2);margin-bottom:10px;line-height:1.6;}
+.sheet-row{display:flex;gap:8px;margin-bottom:6px;align-items:flex-start;}
+.sheet-lbl{font-size:12px;color:var(--tx3);min-width:50px;font-weight:600;padding-top:1px;}
+.sheet-val{font-size:12px;color:var(--tx);line-height:1.55;}
+.sheet-tel{color:var(--primary);text-decoration:none;font-weight:600;font-size:12px;}
+.sheet-link{color:var(--primary);text-decoration:none;font-weight:600;font-size:12px;word-break:break-all;}
+.sheet-days{display:flex;flex-wrap:wrap;gap:3px;}
+.sheet-day{padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;background:#EEF6FF;color:#1A56DB;border:1px solid #BFDBFE;}
+.sheet-target{padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;}
+.sheet-btns{display:flex;gap:8px;margin-top:14px;}
+.sheet-btn-kakao{flex:1;background:#FEE500;color:#3A1D96;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;}
+.sheet-btn-list{background:var(--pl);color:var(--primary);border:1px solid #C4D4F8;border-radius:8px;padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
 .kakao-overlay{
   position:relative;
   background:#fff;
@@ -322,6 +351,12 @@ button,input,select,a{font-family:inherit;}
       <div class="leg-row"><div class="leg-dot" style="background:#2D6BE4"></div>청소년활동</div>
       <div class="leg-row"><div class="leg-dot" style="background:#16A97B"></div>상담·복지</div>
       <div class="leg-row"><div class="leg-dot" style="background:#E8820C"></div>기타</div>
+    </div>
+    <!-- 기관 바텀시트 -->
+    <div class="map-sheet-bg" id="map-sheet-bg" onclick="closeSheet()"></div>
+    <div class="map-sheet" id="map-sheet">
+      <div class="map-sheet-handle"></div>
+      <div class="map-sheet-body" id="map-sheet-body"></div>
     </div>
   </div>
   <!-- 목록 뷰 -->
@@ -641,7 +676,7 @@ function initMap(){
   // 지도 클릭 시 드로어·오버레이 닫기
   kakao.maps.event.addListener(kakaoMap,'click',()=>{
     closeDrawer();
-    closeOverlay();
+    closeSheet();
   });
 
   renderAll();
@@ -658,119 +693,37 @@ function getCol(type){
   return{color:'#E8820C',badge:'to'};
 }
 
-function closeOverlay(){
-  if(currentOverlay){currentOverlay.setMap(null);currentOverlay=null;}
+function closeSheet(){
+  document.getElementById('map-sheet').classList.remove('on');
+  document.getElementById('map-sheet-bg').classList.remove('on');
 }
 
-function showOverlay(f){
-  closeOverlay();
+function showSheet(f){
+  closeSheet();
+  closeDrawer();
   const col=getCol(f.type);
   const tgt=f.targets.filter(t=>t!=='대').map(t=>t==='후기청소년'?'후기':t==='학교밖청소년'?'학교밖':t);
 
-  // DOM으로 직접 생성 (따옴표 충돌 방지)
-  const wrap=document.createElement('div');
-  wrap.className='kakao-overlay';
+  const body=document.getElementById('map-sheet-body');
+  body.innerHTML=`
+    <div class="sheet-header">
+      <span class="tbadge ${col.badge}">${f.type}</span>
+      <span style="font-size:11px;color:var(--tx3);">📍 ${f.region}</span>
+    </div>
+    <div class="sheet-name">${f.name}</div>
+    <div class="sheet-desc">${f.desc}</div>
+    <div class="sheet-row"><span class="sheet-lbl">주소</span><span class="sheet-val">${f.address}</span></div>
+    ${f.phone?`<div class="sheet-row"><span class="sheet-lbl">연락처</span><a class="sheet-tel" href="tel:${f.phone}">${f.phone}</a></div>`:''}
+    ${f.website?`<div class="sheet-row"><span class="sheet-lbl">공식링크</span><a class="sheet-link" href="${f.website}" target="_blank">${f.website}</a></div>`:''}
+    <div class="sheet-row"><span class="sheet-lbl">운영요일</span><div class="sheet-days">${f.days.map(d=>`<span class="sheet-day">${d}</span>`).join('')}</div></div>
+    <div class="sheet-row"><span class="sheet-lbl">이용대상</span><div class="sheet-days">${tgt.map(t=>`<span class="sheet-target">${t}</span>`).join('')}</div></div>
+    <div class="sheet-btns">
+      <a class="sheet-btn-kakao" href="${kakaoMapUrl(f)}" target="_blank">카카오맵에서 보기</a>
+      <button class="sheet-btn-list" onclick="closeSheet();goToList(${f.id})">목록보기</button>
+    </div>`;
 
-  // 닫기 버튼
-  const closeBtn=document.createElement('button');
-  closeBtn.className='overlay-close';
-  closeBtn.textContent='✕';
-  closeBtn.addEventListener('click',closeOverlay);
-  wrap.appendChild(closeBtn);
-
-  // 헤더 (유형 + 지역)
-  const header=document.createElement('div');
-  header.className='overlay-header';
-  header.innerHTML=`<span class="tbadge ${col.badge}">${f.type}</span><span style="font-size:11px;color:var(--tx3);">📍 ${f.region}</span>`;
-  wrap.appendChild(header);
-
-  // 이름
-  const name=document.createElement('div');
-  name.className='overlay-name';
-  name.textContent=f.name;
-  wrap.appendChild(name);
-
-  // 한줄소개
-  const desc=document.createElement('div');
-  desc.className='overlay-desc';
-  desc.textContent=f.desc;
-  wrap.appendChild(desc);
-
-  // 주소
-  const addrRow=document.createElement('div');
-  addrRow.className='overlay-row';
-  addrRow.innerHTML=`<span class="overlay-lbl">주소</span><span class="overlay-val">${f.address}</span>`;
-  wrap.appendChild(addrRow);
-
-  // 연락처
-  if(f.phone){
-    const phoneRow=document.createElement('div');
-    phoneRow.className='overlay-row';
-    const phoneLbl=document.createElement('span');
-    phoneLbl.className='overlay-lbl';
-    phoneLbl.textContent='연락처';
-    const phoneLink=document.createElement('a');
-    phoneLink.className='overlay-val overlay-tel';
-    phoneLink.textContent=f.phone;
-    phoneLink.addEventListener('click',()=>{ window.location.href='tel:'+f.phone; });
-    phoneRow.appendChild(phoneLbl);
-    phoneRow.appendChild(phoneLink);
-    wrap.appendChild(phoneRow);
-  }
-
-  // 공식링크
-  if(f.website){
-    const webRow=document.createElement('div');
-    webRow.className='overlay-row';
-    const webLbl=document.createElement('span');
-    webLbl.className='overlay-lbl';
-    webLbl.textContent='공식링크';
-    const webLink=document.createElement('a');
-    webLink.className='overlay-val overlay-link';
-    webLink.textContent=f.website;
-    webLink.addEventListener('click',()=>{ window.open(f.website,'_blank'); });
-    webRow.appendChild(webLbl);
-    webRow.appendChild(webLink);
-    wrap.appendChild(webRow);
-  }
-
-  // 운영요일
-  const dayRow=document.createElement('div');
-  dayRow.className='overlay-row';
-  dayRow.innerHTML=`<span class="overlay-lbl">운영요일</span><div class="overlay-days">${f.days.map(d=>`<span class="overlay-day">${d}</span>`).join('')}</div>`;
-  wrap.appendChild(dayRow);
-
-  // 이용대상
-  const tgtRow=document.createElement('div');
-  tgtRow.className='overlay-row';
-  tgtRow.innerHTML=`<span class="overlay-lbl">이용대상</span><div class="overlay-days">${tgt.map(t=>`<span class="overlay-target">${t}</span>`).join('')}</div>`;
-  wrap.appendChild(tgtRow);
-
-  // 버튼
-  const btns=document.createElement('div');
-  btns.className='overlay-btns';
-
-  const kakaoBtn=document.createElement('a');
-  kakaoBtn.className='overlay-btn-kakao';
-  kakaoBtn.textContent='카카오맵에서 보기';
-  kakaoBtn.addEventListener('click',()=>{ window.open(kakaoMapUrl(f),'_blank'); });
-  btns.appendChild(kakaoBtn);
-
-  const listBtn=document.createElement('button');
-  listBtn.className='overlay-btn-list';
-  listBtn.textContent='목록보기';
-  listBtn.addEventListener('click',()=>{ closeOverlay(); goToList(f.id); });
-  btns.appendChild(listBtn);
-
-  wrap.appendChild(btns);
-
-  currentOverlay=new kakao.maps.CustomOverlay({
-    position: new kakao.maps.LatLng(f.lat, f.lng),
-    content: wrap,
-    yAnchor: 1.3,
-    zIndex: 3
-  });
-  currentOverlay.setMap(kakaoMap);
+  document.getElementById('map-sheet').classList.add('on');
+  document.getElementById('map-sheet-bg').classList.add('on');
 }
 
 // ==================== 렌더 ====================
@@ -836,7 +789,7 @@ function renderMarkers(list){
   // 기존 마커 제거
   markers.forEach(m=>m.setMap(null));
   markers=[];
-  closeOverlay();
+  closeSheet();
 
   const vis=new Set(list.map(f=>f.id));
   facilities.forEach(f=>{
@@ -860,7 +813,7 @@ function renderMarkers(list){
       markerEl.addEventListener('click',(e)=>{
         e.stopPropagation();
         highlightCard(f.id);
-        showOverlay(f);
+        showSheet(f);
         closeDrawer();
       });
     }
@@ -875,7 +828,7 @@ function selectFacility(id){
   setTimeout(()=>{
     kakaoMap.setCenter(new kakao.maps.LatLng(f.lat,f.lng));
     kakaoMap.setLevel(3);
-    showOverlay(f);
+    showSheet(f);
   },150);
 }
 
@@ -886,7 +839,7 @@ function highlightCard(id){
 }
 
 function goToList(id){
-  closeOverlay();
+  closeSheet();
   switchTab('list');
   setTimeout(()=>highlightCard(id),200);
 }
