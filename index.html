@@ -45,7 +45,7 @@ button,input,select,a{font-family:inherit;}
 .top-logo-text{font-size:15px;font-weight:900;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .top-logo-sub{font-size:10px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .top-btns{display:flex;gap:6px;flex-shrink:0;}
-.top-btn{background:none;border:1px solid var(--bdr);border-radius:var(--rs);padding:7px 11px;font-size:12px;color:var(--tx2);cursor:pointer;white-space:nowrap;min-height:34px;}
+.top-btn{background:none;border:1px solid var(--bdr);border-radius:var(--rs);padding:7px 10px;font-size:15px;color:var(--tx2);cursor:pointer;white-space:nowrap;min-height:34px;}
 .top-btn.accent{background:var(--pl);border-color:#C4D4F8;color:var(--primary);font-weight:700;}
 .top-btn.share{background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-size:15px;padding:7px 10px;}
 
@@ -334,7 +334,7 @@ button,input,select,a{font-family:inherit;}
     </div>
   </div>
   <div class="top-btns">
-    <button class="top-btn accent" onclick="openAbout()">💡 소개</button>
+    <button class="top-btn accent" onclick="openAbout()" title="소개">📌</button>
     <button class="top-btn share" onclick="shareLink()" title="공유">🔗</button>
     <button class="top-btn" onclick="openAdmin()" title="관리자">🔧</button>
   </div>
