@@ -608,11 +608,11 @@ button,input,select,a{font-family:inherit;}
 
 <script>
 // ==================== 구글 시트 연동 설정 ====================
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycby-xBLOc9diT2NQOonE2D5UAf4VYp5w5RjiyGn3nC30o2Al4k2l31-X-mBySDFAB9kC/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyJ_5PWMCVvWZjNaGN81HD3ovxiqeCtfh6ZyGIi6GGaZS2Cmhm3PfUBgjhCcIrkGzn1/exec';
 const CACHE_KEY = 'gd_facilities_cache';
 const CACHE_TS_KEY = 'gd_facilities_ts';
 const CACHE_VER_KEY = 'gd_cache_ver';
-const CACHE_VER = '20260323'; // 코드 업데이트 시 이 값을 바꾸면 캐시 자동 초기화
+const CACHE_VER = '20260324'; // 코드 업데이트 시 이 값을 바꾸면 캐시 자동 초기화
 
 // 캐시 버전 체크 - 버전 다르면 캐시 삭제
 if(localStorage.getItem(CACHE_VER_KEY) !== CACHE_VER){
@@ -641,13 +641,13 @@ function loadFacilitiesFromSheet(forceRefresh=false){
   if(!forceRefresh && cached && cachedTs){
     try {
       facilities = JSON.parse(cached);
-      // 캐시된 공지도 복원
       noticeText = localStorage.getItem('gd_notice_cache') || '';
+      sheetReleases = JSON.parse(localStorage.getItem('gd_releases_cache') || '[]');
       renderNoticeBanner();
       facilitiesLoaded = true;
       renderAll();
       return;
-    } catch(e){ /* 캐시 파싱 오류 시 서버에서 다시 로드 */ }
+    } catch(e){}
   }
 
   // 서버에서 새로 로드
@@ -662,12 +662,18 @@ function loadFacilitiesFromSheet(forceRefresh=false){
       // 공지 업데이트
       if(res.notice !== undefined){
         noticeText = res.notice || '';
+        localStorage.setItem('gd_notice_cache', noticeText);
         renderNoticeBanner();
+      }
+      // Release Note 업데이트
+      if(res.releases !== undefined){
+        sheetReleases = res.releases || [];
+        localStorage.setItem('gd_releases_cache', JSON.stringify(sheetReleases));
+        renderAboutReleaseNotes();
       }
       // 캐시 저장
       localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
       localStorage.setItem(CACHE_TS_KEY, new Date().toISOString());
-      if(res.notice !== undefined) localStorage.setItem('gd_notice_cache', noticeText);
       facilitiesLoaded = true;
       hideLoadingOverlay();
       renderAll();
@@ -676,7 +682,6 @@ function loadFacilitiesFromSheet(forceRefresh=false){
     .catch(err => {
       hideLoadingOverlay();
       console.error('시트 로드 실패:', err);
-      // 캐시라도 있으면 사용
       const cached2 = localStorage.getItem(CACHE_KEY);
       if(cached2){
         facilities = JSON.parse(cached2);
@@ -782,9 +787,14 @@ function adminRefreshSheet(){
         noticeText = res.notice || '';
         localStorage.setItem('gd_notice_cache', noticeText);
         renderNoticeBanner();
-        // 관리자 입력창도 업데이트
         const inp = document.getElementById('notice-input');
         if(inp) inp.value = noticeText;
+      }
+      // Release Note 업데이트
+      if(res.releases !== undefined){
+        sheetReleases = res.releases || [];
+        localStorage.setItem('gd_releases_cache', JSON.stringify(sheetReleases));
+        renderAboutReleaseNotes();
       }
       localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
       const ts = new Date();
@@ -1067,6 +1077,7 @@ function showShareToast(msg){
   toast._t = setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
 }
 let noticeText = '';
+let sheetReleases = JSON.parse(localStorage.getItem('gd_releases_cache') || '[]');
 
 function renderNoticeBanner(){
   const bar = document.getElementById('notice-bar');
@@ -1399,13 +1410,8 @@ function toggleAboutRelease(){
   aboutExpanded = !aboutExpanded;
   const btn = document.getElementById('about-release-toggle');
   const more = document.getElementById('about-release-notes-more');
-  if(aboutExpanded){
-    more.style.display='block';
-    btn.textContent='접기 ▲';
-  } else {
-    more.style.display='none';
-    btn.textContent='펼치기 ▼';
-  }
+  if(aboutExpanded){ more.style.display='block'; btn.textContent='접기 ▲'; }
+  else             { more.style.display='none';  btn.textContent='펼치기 ▼'; }
 }
 
 function renderAboutReleaseNotes(){
@@ -1414,13 +1420,16 @@ function renderAboutReleaseNotes(){
   const btn     = document.getElementById('about-release-toggle');
   if(!preview) return;
 
-  if(!releaseNotes.length){
+  const list = sheetReleases; // 시트에서 받은 데이터 (이미 최신순 정렬)
+
+  if(!list.length){
     preview.innerHTML='<div style="color:var(--tx3);font-size:12px;">아직 업데이트 내역이 없어요.</div>';
     if(more) more.innerHTML='';
     if(btn)  btn.style.display='none';
     return;
   }
 
+  // 비고 없이 공개 항목만 표시
   const makeItem = n => `
     <div style="padding:6px 0;border-bottom:1px solid var(--bdr);">
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:2px;">
@@ -1430,16 +1439,14 @@ function renderAboutReleaseNotes(){
       <div style="font-size:13px;color:var(--tx1);">${n.content}</div>
     </div>`;
 
-  const PREVIEW_COUNT = 1;
-  preview.innerHTML = releaseNotes.slice(0, PREVIEW_COUNT).map(makeItem).join('');
+  preview.innerHTML = makeItem(list[0]);
 
-  if(releaseNotes.length > PREVIEW_COUNT){
-    if(more) more.innerHTML = releaseNotes.slice(PREVIEW_COUNT).map(makeItem).join('');
+  if(list.length > 1){
+    if(more) more.innerHTML = list.slice(1).map(makeItem).join('');
     if(btn){
       btn.style.display='block';
-      // 상태 유지
       if(aboutExpanded){ more.style.display='block'; btn.textContent='접기 ▲'; }
-      else              { more.style.display='none';  btn.textContent='펼치기 ▼'; }
+      else             { more.style.display='none';  btn.textContent='펼치기 ▼'; }
     }
   } else {
     if(more) more.innerHTML='';
@@ -1545,23 +1552,28 @@ function renderTable(){
     <div id="form-area"></div>
     <div style="margin-top:24px;border-top:1px solid var(--bdr);padding-top:18px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:10px;">📢 공지 및 안내</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input id="notice-input" class="form-inp" style="flex:1;min-width:200px;"
-          placeholder="공지 내용 입력 (비워두면 표시 안 됨)"
-          value="${noticeText}"/>
-        <button class="btn-submit" style="padding:9px 16px;font-size:12px;white-space:nowrap;" onclick="saveNotice()">저장</button>
-        <button class="act-btn" style="padding:9px 14px;font-size:12px;white-space:nowrap;" onclick="clearNotice()">삭제</button>
-      </div>
-      <div style="font-size:11px;color:var(--tx3);margin-top:6px;">💡 지도 상단에 한 줄로 표시돼요. 비워두면 아무것도 표시되지 않아요.</div>
+      ${noticeText
+        ? `<div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:11px 14px;font-size:13px;color:#7B4F00;line-height:1.6;">
+             <span style="font-size:15px;">📢</span> ${noticeText}
+           </div>`
+        : `<div style="font-size:13px;color:var(--tx3);padding:8px 0;">현재 등록된 공지가 없어요.</div>`
+      }
+      <div style="font-size:11px;color:var(--tx3);margin-top:6px;">💡 공지는 구글 시트 <strong>notice</strong> 탭에서 수정 후 🔄 업데이트 버튼을 눌러주세요.</div>
     </div>
     <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:14px;font-weight:700;">📋 Release Note</div>
-        <button class="btn-submit" style="padding:7px 14px;font-size:12px;" onclick="showReleaseForm()">+ 추가</button>
-      </div>
-      <div id="release-form-area"></div>
-      <div id="release-list-area">${renderReleaseListPage(releaseItems, releaseStartIdx)}</div>
-      ${paginator(releasePage, totalRPages, 'goReleasePage')}
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">📋 Release Note</div>
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:10px;">💡 구글 시트 <strong>release</strong> 탭에서 수정 후 🔄 업데이트 버튼을 눌러주세요.</div>
+      ${sheetReleases.length ? sheetReleases.map(n=>`
+        <div style="padding:9px 0;border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:3px;">
+            ${rnTagBadge(n.type)}
+            <span style="font-size:12px;color:var(--tx3);">${n.date}</span>
+          </div>
+          <div style="font-size:13px;color:var(--tx1);margin-bottom:${n.memo?'3px':'0'}">${n.content}</div>
+          ${n.memo?`<div style="font-size:11px;color:var(--tx3);background:#F9FAFB;padding:4px 8px;border-radius:5px;">📝 ${n.memo}</div>`:''}
+        </div>`).join('')
+        : `<div style="font-size:13px;color:var(--tx3);padding:8px 0;">아직 등록된 내역이 없어요.</div>`
+      }
     </div>`;
 }
 
