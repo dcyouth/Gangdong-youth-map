@@ -599,17 +599,12 @@ button,input,select,a{font-family:inherit;}
 </div>
 
 <script>
+// ==================== 구글 시트 연동 설정 ====================
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxHuIw12iTKTRtKQphBDsshM4Y181z1K3JX9AC8OcbiDU58HJ3acSK2f1tZT5FX_nkC/exec';
+
 // ==================== 데이터 ====================
-let facilities=[
-  {id:1,name:"강동구립 둔촌청소년문화의집",type:"청소년활동",address:"서울특별시 강동구 진황도로61길 25-23, 1층",region:"둔촌동",days:["화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"당찬 청소년들의 공간, 당찬 둔촌청소년문화의집",phone:"02-6953-0931",website:"https://dcyouth.or.kr",lat:37.5294496309675,lng:127.144718797108},
-  {id:2,name:"강동구립 천호청소년문화의집",type:"청소년활동",address:"서울특별시 강동구 천중로 61",region:"천호동",days:["화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"청소년, 지속 가능한 미래를 열다",phone:"02-2039-0913",website:"http://www.chyouth.or.kr",lat:37.5452090350281,lng:127.128834178145},
-  {id:3,name:"시립강동청소년센터",type:"청소년활동",address:"서울특별시 강동구 아리수로93길 47",region:"강일동",days:["월","화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"너랑 나랑, 우리끼리 와글 WAGLE",phone:"02-6252-1300",website:"http://www.wagle.or.kr",lat:37.5664776017967,lng:127.173029251627},
-  {id:4,name:"강동구청소년상담복지센터",type:"상담및복지",address:"서울특별시 강동구 아리수로93길 47, 2층",region:"강일동",days:["월","화","수","목","금"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"청소년안전망",phone:"02-6252-1388",website:"https://gangdong1388.or.kr",lat:37.5664776017967,lng:127.173029251627},
-  {id:5,name:"강동구아동청소년미래본부",type:"청소년활동",address:"서울특별시 강동구 성내동 13, 1층",region:"성내동",days:["화","수","목","금","토"],targets:["초","중","고"],desc:"강동구아동청소년미래본부",phone:"02-470-4415",website:"",lat:37.5304,lng:127.1225},
-  {id:6,name:"강동중앙도서관",type:"기타",address:"서울특별시 강동구 양재대로84길 63",region:"둔촌동",days:["화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"강동중앙도서관-강동구립도서관",phone:"02-470-0423",website:"https://gdlibrary.or.kr",lat:37.5243505597151,lng:127.136965792517},
-  {id:7,name:"강동여자단기청소년쉼터",type:"상담및복지",address:"서울특별시 강동구 구천면로24길 20-20",region:"천호동",days:["월","화","수","목","금","토","일"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"강동여자단기청소년쉼터 더함",phone:"02-488-7961",website:"https://youthplus7961.or.kr",lat:37.5402449228609,lng:127.125032498643},
-  {id:8,name:"강동진로직업체험센터",type:"기타",address:"서울특별시 강동구 구천면로 395, 2층",region:"명일동",days:["월","화","수","목","금","토"],targets:["초","중","고","후기청소년","학교밖청소년"],desc:"꿈을 상상하면 팡팡 이루어진다 '상상팡팡'",phone:"02-481-7088",website:"https://blog.naver.com/edugd",lat:37.5510230174179,lng:127.142909546851},
-];
+let facilities = [];
+let facilitiesLoaded = false;
 
 const RC={'강일동':[37.5650,127.1739],'상일동':[37.5502,127.1721],'고덕동':[37.5588,127.1580],'암사동':[37.5527,127.1335],'명일동':[37.5488,127.1478],'천호동':[37.5427,127.1307],'길동':[37.5345,127.1427],'성내동':[37.5296,127.1283],'둔촌동':[37.5333,127.1420]};
 
@@ -617,6 +612,129 @@ let ADMIN_PW="1234",adminUnlocked=false,editingIdx=null;
 let filters={type:'all-type',region:'all-region',target:'all-target',day:'all-day'};
 let curTab='map',drawerOpen=false;
 let kakaoMap, markers=[], currentOverlay=null;
+
+// ==================== 구글 시트 로드 ====================
+function loadFacilitiesFromSheet(){
+  showLoadingOverlay('🗺️ 시설 데이터를 불러오는 중...');
+  fetch(SHEET_URL)
+    .then(r => r.json())
+    .then(res => {
+      if(res.status !== 'ok') throw new Error('시트 응답 오류');
+      facilities = res.data.map(row => parseSheetRow(row));
+      facilitiesLoaded = true;
+      hideLoadingOverlay();
+      renderAll();
+    })
+    .catch(err => {
+      hideLoadingOverlay();
+      console.error('시트 로드 실패:', err);
+      showSheetError();
+    });
+}
+
+function parseSheetRow(row){
+  const DAY_MAP  = ['월','화','수','목','금','토','일'];
+  const TGT_MAP  = ['초','중','고','후기청소년','학교밖청소년'];
+  const TGT_KEYS = ['초','중','고','후기청소년','학교밖청소년'];
+
+  // 요일: 시트에 O로 표시된 열 또는 쉼표 구분 문자열 모두 지원
+  let days = [];
+  if(row['월'] !== undefined){
+    DAY_MAP.forEach(d => { if(row[d]==='O'||row[d]===true) days.push(d); });
+  } else if(row.days){
+    days = String(row.days).split(',').map(s=>s.trim()).filter(Boolean);
+  }
+
+  // 이용대상
+  let targets = [];
+  const tgtColMap = {'초':'초','중':'중','고':'고','후기청소년':'후기청소년','학교밖청소년':'학교밖청소년'};
+  let hasTgtCols = Object.keys(tgtColMap).some(k => row[k] !== undefined);
+  if(hasTgtCols){
+    Object.entries(tgtColMap).forEach(([col, val]) => {
+      if(row[col]==='O'||row[col]===true) targets.push(val);
+    });
+  } else if(row.targets){
+    targets = String(row.targets).split(',').map(s=>s.trim()).filter(Boolean);
+  }
+
+  return {
+    id:      row.id,
+    name:    row.name    || '',
+    type:    row.type    || '기타',
+    address: row.address || '',
+    region:  row.region  || '',
+    days,
+    targets,
+    desc:    row.desc    || '',
+    phone:   row.phone   || '',
+    website: row.website || '',
+    lat:     parseFloat(row.lat) || 0,
+    lng:     parseFloat(row.lng) || 0,
+  };
+}
+
+// ==================== 시트에 저장 (추가/수정/삭제) ====================
+function sheetPost(payload){
+  return fetch(SHEET_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }).then(r => r.json());
+}
+
+function rowToSheetData(f){
+  return {
+    id: f.id,
+    name: f.name,
+    type: f.type,
+    address: f.address,
+    region: f.region,
+    '월': f.days.includes('월')?'O':'',
+    '화': f.days.includes('화')?'O':'',
+    '수': f.days.includes('수')?'O':'',
+    '목': f.days.includes('목')?'O':'',
+    '금': f.days.includes('금')?'O':'',
+    '토': f.days.includes('토')?'O':'',
+    '일': f.days.includes('일')?'O':'',
+    '초': f.targets.includes('초')?'O':'',
+    '중': f.targets.includes('중')?'O':'',
+    '고': f.targets.includes('고')?'O':'',
+    '후기청소년': f.targets.includes('후기청소년')?'O':'',
+    '학교밖청소년': f.targets.includes('학교밖청소년')?'O':'',
+    desc: f.desc,
+    phone: f.phone,
+    website: f.website,
+    lat: f.lat,
+    lng: f.lng,
+  };
+}
+
+// ==================== 로딩/에러 오버레이 ====================
+function showLoadingOverlay(msg){
+  let el = document.getElementById('sheet-loading');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'sheet-loading';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-size:15px;color:#1E3A8A;font-weight:700;gap:12px;';
+    el.innerHTML = `<div style="font-size:32px;">🗺️</div><div id="sheet-loading-msg">${msg}</div>`;
+    document.body.appendChild(el);
+  }
+  document.getElementById('sheet-loading-msg').textContent = msg;
+  el.style.display = 'flex';
+}
+function hideLoadingOverlay(){
+  const el = document.getElementById('sheet-loading');
+  if(el) el.style.display = 'none';
+}
+function showSheetError(){
+  let el = document.getElementById('sheet-loading');
+  if(!el){ showLoadingOverlay(''); el = document.getElementById('sheet-loading'); }
+  el.innerHTML = `
+    <div style="font-size:32px;">⚠️</div>
+    <div style="font-size:14px;color:#DC2626;font-weight:700;">데이터를 불러오지 못했어요</div>
+    <div style="font-size:12px;color:#6B7280;">인터넷 연결을 확인하고 다시 시도해주세요</div>
+    <button onclick="location.reload()" style="margin-top:8px;padding:9px 20px;background:#1E3A8A;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">🔄 새로고침</button>`;
+  el.style.display = 'flex';
+}
 
 // ==================== 탭 전환 ====================
 function switchTab(tab){
@@ -1314,38 +1432,61 @@ function showForm(pf){
 }
 function editF(i){editingIdx=i;showForm(facilities[i]);}
 function delF(i){
-  if(!confirm(`"${facilities[i].name}" 삭제할까요?`))return;
-  facilities.splice(i,1);renderTable();renderAll();
+  const f = facilities[i];
+  if(!confirm(`"${f.name}" 삭제할까요?`)) return;
+  showLoadingOverlay('삭제 중...');
+  sheetPost({action:'delete', id: f.id})
+    .then(res => {
+      if(res.status !== 'ok') throw new Error();
+      facilities.splice(i,1);
+      renderTable(); renderAll();
+      hideLoadingOverlay();
+      alert(`"${f.name}" 삭제되었습니다!`);
+    })
+    .catch(() => { hideLoadingOverlay(); alert('삭제 중 오류가 발생했어요. 다시 시도해주세요.'); });
 }
+
 function submitF(){
-  const name=document.getElementById('fn').value.trim();
-  if(!name){alert('시설명을 입력해주세요');return;}
-  const lat=parseFloat(document.getElementById('flat').value);
-  const lng=parseFloat(document.getElementById('flng').value);
-  if(!lat||!lng){alert('위도/경도를 입력해주세요');return;}
-  const DAYS=['월','화','수','목','금','토','일'];
-  const TARGETS=['초','중','고','후기청소년','학교밖청소년'];
-  const days=DAYS.filter(d=>document.getElementById('fd-'+d)?.checked);
-  const targets=TARGETS.filter(t=>document.getElementById('fta-'+t)?.checked);
-  if(!days.length){alert('운영요일을 하나 이상 선택해주세요');return;}
-  if(!targets.length){alert('이용대상을 하나 이상 선택해주세요');return;}
-  let w=document.getElementById('fweb').value.trim();
-  if(w&&!w.startsWith('http'))w='https://'+w;
-  const nf={
-    id:editingIdx!==null?facilities[editingIdx].id:Date.now(),
-    name,type:document.getElementById('ft').value,
-    address:document.getElementById('fa').value.trim(),
-    region:document.getElementById('fr').value,
-    days,targets,
-    desc:document.getElementById('fdesc').value.trim(),
-    phone:document.getElementById('fphone').value.trim(),
-    website:w,
-    naver:document.getElementById('fnav')?.value.trim()||'',
-    lat,lng
+  const name = document.getElementById('fn').value.trim();
+  if(!name){ alert('시설명을 입력해주세요'); return; }
+  const lat = parseFloat(document.getElementById('flat').value);
+  const lng = parseFloat(document.getElementById('flng').value);
+  if(!lat||!lng){ alert('주소를 입력 후 📍 좌표 변환 버튼을 눌러주세요'); return; }
+  const DAYS    = ['월','화','수','목','금','토','일'];
+  const TARGETS = ['초','중','고','후기청소년','학교밖청소년'];
+  const days    = DAYS.filter(d => document.getElementById('fd-'+d)?.checked);
+  const targets = TARGETS.filter(t => document.getElementById('fta-'+t)?.checked);
+  if(!days.length){ alert('운영요일을 하나 이상 선택해주세요'); return; }
+  if(!targets.length){ alert('이용대상을 하나 이상 선택해주세요'); return; }
+  let w = document.getElementById('fweb').value.trim();
+  if(w && !w.startsWith('http')) w = 'https://'+w;
+
+  const isEdit = editingIdx !== null;
+  const nf = {
+    id:      isEdit ? facilities[editingIdx].id : Date.now(),
+    name,
+    type:    document.getElementById('ft').value,
+    address: document.getElementById('fa').value.trim(),
+    region:  document.getElementById('fr').value,
+    days, targets,
+    desc:    document.getElementById('fdesc').value.trim(),
+    phone:   document.getElementById('fphone').value.trim(),
+    website: w,
+    lat, lng
   };
-  if(editingIdx!==null)facilities[editingIdx]=nf;else facilities.push(nf);
-  editingIdx=null;renderTable();renderAll();
-  alert(`"${nf.name}" ${editingIdx!==null?'수정':'추가'}되었습니다!`);
+
+  showLoadingOverlay(isEdit ? '수정 중...' : '추가 중...');
+  sheetPost({ action: isEdit ? 'update' : 'add', data: rowToSheetData(nf) })
+    .then(res => {
+      if(res.status !== 'ok') throw new Error();
+      if(isEdit) facilities[editingIdx] = nf;
+      else facilities.push(nf);
+      editingIdx = null;
+      renderTable(); renderAll();
+      hideLoadingOverlay();
+      alert(`"${nf.name}" ${isEdit?'수정':'추가'}되었습니다!`);
+    })
+    .catch(() => { hideLoadingOverlay(); alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); });
 }
 
 // ==================== 주소 → 좌표 변환 ====================
@@ -1378,8 +1519,12 @@ function addrToCoord(){
     }
   });
 }
+
 window.addEventListener('load', ()=>{
-  kakao.maps.load(initMap);
+  kakao.maps.load(()=>{
+    initMap();
+    loadFacilitiesFromSheet();
+  });
 });
 </script>
 </body>
