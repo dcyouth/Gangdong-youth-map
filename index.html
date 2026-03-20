@@ -333,6 +333,7 @@ button,input,select,a{font-family:inherit;}
     </div>
   </div>
   <div class="top-btns">
+    <button class="top-btn" onclick="shareLink()">🔗 공유</button>
     <button class="top-btn accent" onclick="openAbout()">💡 소개</button>
     <button class="top-btn" onclick="openAdmin()">🔧 관리자</button>
   </div>
@@ -998,7 +999,52 @@ function showSheet(f){
   document.getElementById('map-sheet-bg').classList.add('on');
 }
 
-// ==================== 공지 배너 ====================
+// ==================== 공유 ====================
+function shareLink(){
+  const url = 'https://dcyouth.github.io/Gangdong-youth-map/';
+  const title = '강동구청소년MAP핑!';
+  const text = '강동구 청소년시설을 한눈에! 우리 동네 청소년 시설 안내 지도 🗺️';
+
+  // 모바일 기본 공유 시트 (Web Share API)
+  if(navigator.share){
+    navigator.share({ title, text, url }).catch(()=>{});
+    return;
+  }
+
+  // fallback: 링크 복사
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(()=>{
+      showShareToast('🔗 링크가 복사되었어요!');
+    }).catch(()=> fallbackCopy(url));
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(url){
+  const el = document.createElement('textarea');
+  el.value = url;
+  el.style.cssText = 'position:fixed;opacity:0;';
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
+  showShareToast('🔗 링크가 복사되었어요!');
+}
+
+function showShareToast(msg){
+  let toast = document.getElementById('share-toast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'share-toast';
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1E3A8A;color:#fff;padding:11px 22px;border-radius:24px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap;transition:opacity .3s;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
+}
 let noticeText = localStorage.getItem('gd_notice') || '';
 
 function renderNoticeBanner(){
