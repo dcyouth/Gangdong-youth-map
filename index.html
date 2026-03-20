@@ -601,6 +601,8 @@ button,input,select,a{font-family:inherit;}
 <script>
 // ==================== 구글 시트 연동 설정 ====================
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxHuIw12iTKTRtKQphBDsshM4Y181z1K3JX9AC8OcbiDU58HJ3acSK2f1tZT5FX_nkC/exec';
+const CACHE_KEY = 'gd_facilities_cache';
+const CACHE_TS_KEY = 'gd_facilities_ts';
 
 // ==================== 데이터 ====================
 let facilities = [];
@@ -613,106 +615,186 @@ let filters={type:'all-type',region:'all-region',target:'all-target',day:'all-da
 let curTab='map',drawerOpen=false;
 let kakaoMap, markers=[], currentOverlay=null;
 
-// ==================== 구글 시트 로드 ====================
-function loadFacilitiesFromSheet(){
-  showLoadingOverlay('🗺️ 시설 데이터를 불러오는 중...');
+// ==================== 캐시 기반 로드 ====================
+function loadFacilitiesFromSheet(forceRefresh=false){
+  // 캐시 확인
+  const cached = localStorage.getItem(CACHE_KEY);
+  const cachedTs = localStorage.getItem(CACHE_TS_KEY);
+
+  if(!forceRefresh && cached && cachedTs){
+    try {
+      facilities = JSON.parse(cached);
+      facilitiesLoaded = true;
+      renderAll();
+      return; // 캐시 사용 → 즉시 표시, 네트워크 요청 없음
+    } catch(e){ /* 캐시 파싱 오류 시 서버에서 다시 로드 */ }
+  }
+
+  // 서버에서 새로 로드
+  showLoadingOverlay('🗺️ 시설 데이터 업데이트 중...');
   fetch(SHEET_URL)
     .then(r => r.json())
     .then(res => {
       if(res.status !== 'ok') throw new Error('시트 응답 오류');
-      facilities = res.data.map(row => parseSheetRow(row));
+      facilities = res.data
+        .filter(row => row['시설명'] || row['name'])
+        .map(row => parseSheetRow(row));
+      // 캐시 저장
+      localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
+      localStorage.setItem(CACHE_TS_KEY, new Date().toISOString());
       facilitiesLoaded = true;
       hideLoadingOverlay();
       renderAll();
+      return facilities;
     })
     .catch(err => {
       hideLoadingOverlay();
       console.error('시트 로드 실패:', err);
-      showSheetError();
+      // 캐시라도 있으면 사용
+      const cached2 = localStorage.getItem(CACHE_KEY);
+      if(cached2){
+        facilities = JSON.parse(cached2);
+        facilitiesLoaded = true;
+        renderAll();
+        alert('⚠️ 최신 데이터를 불러오지 못해 이전 데이터를 표시합니다.');
+      } else {
+        showSheetError();
+      }
     });
 }
 
+// ==================== 파싱 (실제 시트 헤더 기준) ====================
+// 실제 시트 헤더: ID, 시설명, 유형, 주소, 지역, 운영요일, 월, 화, 수, 목, 금, 토, 일, 이용대상, 초등, 중학, 고등, 후기청소년, 학교밖, 한줄소개, 연락처, 공식링크, 위도(lat), 경도(lng)
 function parseSheetRow(row){
-  // 구글 시트 헤더: ID, 시설명, 유형, 주소, 지역, 운영요일, (빈칸들), 이용대상, 한줄소개, 연락처, 공식링크, 위도(lat), 경도(lng)
-  // 요일/이용대상은 현재 시트에서 단일 컬럼으로 처리됨 → 쉼표 구분 문자열 또는 O값으로 파싱
+  const DAY_COLS = ['월','화','수','목','금','토','일'];
+  const TGT_COLS = ['초등','중학','고등','후기청소년','학교밖'];
+  const TGT_VAL  = ['초','중','고','후기청소년','학교밖청소년'];
 
-  // 요일 파싱 - "운영요일" 키에서 쉼표 구분 또는 개별 키에서 O 체크
+  // 요일: 개별 컬럼(월~일)에 O 표시
   let days = [];
-  const DAY_MAP = ['월','화','수','목','금','토','일'];
-
-  // 개별 요일 키가 있는 경우 (월,화,수... 각 컬럼)
-  const hasIndivDay = DAY_MAP.some(d => row[d] !== undefined);
-  if(hasIndivDay){
-    DAY_MAP.forEach(d => { if(row[d]==='O' || row[d]===true) days.push(d); });
-  } else if(row['운영요일']){
-    // "운영요일" 단일 컬럼에 쉼표 구분
+  DAY_COLS.forEach(d => {
+    if(row[d]==='O' || row[d]===true || row[d]===1) days.push(d);
+  });
+  // fallback: 운영요일 단일컬럼
+  if(!days.length && row['운영요일']){
     days = String(row['운영요일']).split(',').map(s=>s.trim()).filter(Boolean);
   }
 
-  // 이용대상 파싱
+  // 이용대상: 초등→초, 중학→중, 고등→고, 후기청소년→후기청소년, 학교밖→학교밖청소년
   let targets = [];
-  const TGT_MAP = ['초등학생','중학생','고등학생','후기청소년','학교밖청소년'];
-  const TGT_SHORT = {'초등학생':'초','중학생':'중','고등학생':'고','후기청소년':'후기청소년','학교밖청소년':'학교밖청소년'};
-  const TGT_KEYS_ALT = ['초','중','고','후기청소년','학교밖청소년'];
-
-  const hasIndivTgt = TGT_MAP.some(t => row[t] !== undefined) || TGT_KEYS_ALT.some(t => row[t] !== undefined);
-  if(hasIndivTgt){
-    [...TGT_MAP, ...TGT_KEYS_ALT].forEach(t => {
-      if((row[t]==='O' || row[t]===true) && !targets.includes(t)) targets.push(t);
-    });
-  } else if(row['이용대상']){
+  TGT_COLS.forEach((col, i) => {
+    if(row[col]==='O' || row[col]===true || row[col]===1) targets.push(TGT_VAL[i]);
+  });
+  // fallback: 이용대상 단일컬럼
+  if(!targets.length && row['이용대상']){
     targets = String(row['이용대상']).split(',').map(s=>s.trim()).filter(Boolean);
   }
 
   return {
-    id:      row['ID']       || row['id']      || '',
-    name:    row['시설명']   || row['name']     || '',
-    type:    row['유형']     || row['type']     || '기타',
-    address: row['주소']     || row['address']  || '',
-    region:  row['지역']     || row['region']   || '',
+    id:      row['ID']        || row['id']      || Date.now(),
+    name:    row['시설명']    || row['name']     || '',
+    type:    row['유형']      || row['type']     || '기타',
+    address: row['주소']      || row['address']  || '',
+    region:  row['지역']      || row['region']   || '',
     days,
     targets,
-    desc:    row['한줄소개'] || row['desc']     || '',
-    phone:   row['연락처']   || row['phone']    || '',
-    website: row['공식링크'] || row['website']  || '',
-    lat:     parseFloat(row['위도(lat)'] || row['lat']) || 0,
-    lng:     parseFloat(row['경도(lng)'] || row['lng']) || 0,
+    desc:    row['한줄소개']  || row['desc']     || '',
+    phone:   String(row['연락처']  || row['phone']    || ''),
+    website: row['공식링크']  || row['website']  || '',
+    lat:     parseFloat(row['위도(lat)'] ?? row['lat']) || 0,
+    lng:     parseFloat(row['경도(lng)'] ?? row['lng']) || 0,
   };
 }
 
-// ==================== 시트에 저장 (추가/수정/삭제) ====================
+// ==================== 시트에 저장 ====================
 function sheetPost(payload){
   return fetch(SHEET_URL, {
-    method: 'POST',
+    method:'POST',
     body: JSON.stringify(payload)
   }).then(r => r.json());
 }
 
 function rowToSheetData(f){
   return {
-    id: f.id,
-    name: f.name,
-    type: f.type,
-    address: f.address,
-    region: f.region,
-    '월': f.days.includes('월')?'O':'',
-    '화': f.days.includes('화')?'O':'',
-    '수': f.days.includes('수')?'O':'',
-    '목': f.days.includes('목')?'O':'',
-    '금': f.days.includes('금')?'O':'',
-    '토': f.days.includes('토')?'O':'',
+    'ID': f.id, '시설명': f.name, '유형': f.type,
+    '주소': f.address, '지역': f.region,
+    '월': f.days.includes('월')?'O':'', '화': f.days.includes('화')?'O':'',
+    '수': f.days.includes('수')?'O':'', '목': f.days.includes('목')?'O':'',
+    '금': f.days.includes('금')?'O':'', '토': f.days.includes('토')?'O':'',
     '일': f.days.includes('일')?'O':'',
-    '초': f.targets.includes('초')?'O':'',
-    '중': f.targets.includes('중')?'O':'',
-    '고': f.targets.includes('고')?'O':'',
+    '초등': f.targets.includes('초')?'O':'',
+    '중학': f.targets.includes('중')?'O':'',
+    '고등': f.targets.includes('고')?'O':'',
     '후기청소년': f.targets.includes('후기청소년')?'O':'',
-    '학교밖청소년': f.targets.includes('학교밖청소년')?'O':'',
-    desc: f.desc,
-    phone: f.phone,
-    website: f.website,
-    lat: f.lat,
-    lng: f.lng,
+    '학교밖': f.targets.includes('학교밖청소년')?'O':'',
+    '한줄소개': f.desc, '연락처': f.phone, '공식링크': f.website,
+    '위도(lat)': f.lat, '경도(lng)': f.lng,
   };
+}
+
+// ==================== 관리자: 업데이트 + 좌표 일괄변환 ====================
+function adminRefreshSheet(){
+  const btn = document.getElementById('btn-admin-refresh');
+  if(btn){ btn.disabled=true; btn.textContent='업데이트 중...'; }
+  fetch(SHEET_URL)
+    .then(r => r.json())
+    .then(res => {
+      if(res.status !== 'ok') throw new Error();
+      facilities = res.data
+        .filter(row => row['시설명'] || row['name'])
+        .map(row => parseSheetRow(row));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
+      const ts = new Date();
+      const tsStr = `${ts.getFullYear()}.${String(ts.getMonth()+1).padStart(2,'0')}.${String(ts.getDate()).padStart(2,'0')} ${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
+      localStorage.setItem(CACHE_TS_KEY, ts.toISOString());
+      renderAll();
+      renderTable();
+      if(btn){ btn.disabled=false; btn.textContent='🔄 업데이트'; }
+      const tsEl = document.getElementById('refresh-ts');
+      if(tsEl) tsEl.textContent = tsStr + ' 업데이트 반영됨';
+    })
+    .catch(() => {
+      if(btn){ btn.disabled=false; btn.textContent='🔄 업데이트'; }
+      alert('업데이트 실패. 인터넷 연결을 확인해주세요.');
+    });
+}
+
+function adminBatchGeocode(){
+  const targets = facilities.filter(f => f.address && (!f.lat || !f.lng));
+  if(!targets.length){ alert('좌표가 없는 시설이 없어요!'); return; }
+  if(!confirm(`좌표가 없는 시설 ${targets.length}개의 좌표를 일괄 변환할까요?`)) return;
+
+  const btn = document.getElementById('btn-batch-geo');
+  if(btn){ btn.disabled=true; btn.textContent='변환 중...'; }
+
+  const geocoder = new kakao.maps.services.Geocoder();
+  let done=0, fail=0;
+
+  const processNext = (idx) => {
+    if(idx >= targets.length){
+      // 전체 완료 → 캐시 저장 + 렌더
+      localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
+      renderAll(); renderTable();
+      if(btn){ btn.disabled=false; btn.textContent='📍 좌표 일괄변환'; }
+      alert(`완료! 성공 ${done}개, 실패 ${fail}개`);
+      return;
+    }
+    const f = targets[idx];
+    geocoder.addressSearch(f.address, (result, status) => {
+      if(status === kakao.maps.services.Status.OK){
+        const fi = facilities.findIndex(x => x.id === f.id);
+        if(fi !== -1){
+          facilities[fi].lat = parseFloat(result[0].y);
+          facilities[fi].lng = parseFloat(result[0].x);
+          // 시트에도 저장
+          sheetPost({action:'update', data: rowToSheetData(facilities[fi])});
+        }
+        done++;
+      } else { fail++; }
+      setTimeout(() => processNext(idx+1), 300); // API 과부하 방지
+    });
+  };
+  processNext(0);
 }
 
 // ==================== 로딩/에러 오버레이 ====================
@@ -1336,9 +1418,14 @@ function renderTable(){
   const releaseStartIdx = (releasePage-1)*RELEASE_PER_PAGE;
 
   document.getElementById('admin-body').innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
       <div style="font-size:14px;font-weight:700;">시설 목록 (${facilities.length}개)</div>
       <button class="btn-submit" style="padding:8px 16px;" onclick="showForm()">+ 추가</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#F0F4FF;border-radius:10px;border:1px solid #C4D4F8;">
+      <button id="btn-admin-refresh" class="btn-submit" style="padding:7px 14px;font-size:12px;" onclick="adminRefreshSheet()">🔄 업데이트</button>
+      <button id="btn-batch-geo" class="act-btn" style="padding:7px 14px;font-size:12px;" onclick="adminBatchGeocode()">📍 좌표 일괄변환</button>
+      <span id="refresh-ts" style="font-size:11px;color:var(--tx3);">${(()=>{const ts=localStorage.getItem('gd_facilities_ts');if(!ts)return '마지막 업데이트 정보 없음';const d=new Date(ts);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 업데이트 반영됨`;})()}</span>
     </div>
     <div style="overflow-x:auto;">
       <table class="admin-table">
