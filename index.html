@@ -1464,7 +1464,6 @@ function renderTable(){
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#F0F4FF;border-radius:10px;border:1px solid #C4D4F8;">
       <button id="btn-admin-refresh" class="btn-submit" style="padding:7px 14px;font-size:12px;" onclick="adminRefreshSheet()">🔄 업데이트</button>
       <button id="btn-batch-geo" class="act-btn" style="padding:7px 14px;font-size:12px;" onclick="adminBatchGeocode()">📍 좌표 일괄변환</button>
-      <button class="act-btn" style="padding:7px 14px;font-size:12px;" onclick="adminCheckLinks()">🔗 링크 진단</button>
       <span id="refresh-ts" style="font-size:11px;color:var(--tx3);">${(()=>{const ts=localStorage.getItem('gd_facilities_ts');if(!ts)return '마지막 업데이트 정보 없음';const d=new Date(ts);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 업데이트 반영됨`;})()}</span>
     </div>
     <div style="overflow-x:auto;">
@@ -1511,14 +1510,6 @@ function checkWebLink(){
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-}
-
-function adminCheckLinks(){
-  const lines = facilities.map(f => {
-    const raw = f.website || '(없음)';
-    return `[${f.id}] ${f.name}\n    → ${raw}`;
-  }).join('\n');
-  alert('📋 공식링크 현황\n\n' + lines);
 }
 
 function goFacilityPage(p){ facilityPage=p; renderTable(); }
