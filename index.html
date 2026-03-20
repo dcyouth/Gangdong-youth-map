@@ -74,8 +74,11 @@ button,input,select,a{font-family:inherit;}
 #map{width:100%;height:100%;position:absolute;top:0;left:0;right:0;bottom:0;}
 
 /* 지역 칩 */
-.region-chip{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid var(--bdr);border-radius:20px;padding:7px 16px;font-size:12px;color:var(--tx2);z-index:500;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.1);}
-.region-chip.on{background:var(--pl);color:var(--primary);border-color:#C4D4F8;font-weight:700;pointer-events:all;cursor:pointer;}
+.region-chip{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid var(--bdr);border-radius:20px;padding:7px 16px;font-size:12px;color:var(--tx2);z-index:500;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.1);display:none;}
+.region-chip.on{background:var(--pl);color:var(--primary);border-color:#C4D4F8;font-weight:700;pointer-events:all;cursor:pointer;display:block;}
+/* 공지 배너 */
+.notice-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,248,225,.97);border:1px solid #FFD54F;border-radius:20px;padding:7px 18px;font-size:12px;color:#7B4F00;z-index:499;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.1);max-width:88%;overflow:hidden;text-overflow:ellipsis;display:none;align-items:center;gap:6px;}
+.notice-bar.on{display:flex;}
 
 /* 범례 */
 .map-legend{position:absolute;bottom:12px;right:10px;background:rgba(255,255,255,.95);border:1px solid var(--bdr);border-radius:var(--rs);padding:9px 12px;font-size:11px;z-index:500;box-shadow:0 2px 8px rgba(0,0,0,.08);}
@@ -346,7 +349,8 @@ button,input,select,a{font-family:inherit;}
   <!-- 지도 뷰 -->
   <div id="map-view" class="on">
     <div id="map"></div>
-    <div class="region-chip" id="region-chip">🗺️ 행정동을 탭해서 지역 필터</div>
+    <div class="notice-bar" id="notice-bar"><span id="notice-bar-text"></span></div>
+    <div class="region-chip" id="region-chip"></div>
     <div class="map-legend">
       <div class="leg-row"><div class="leg-dot" style="background:#2D6BE4"></div>청소년활동</div>
       <div class="leg-row"><div class="leg-dot" style="background:#16A97B"></div>상담·복지</div>
@@ -977,22 +981,40 @@ function showSheet(f){
   document.getElementById('map-sheet-bg').classList.add('on');
 }
 
+// ==================== 공지 배너 ====================
+let noticeText = localStorage.getItem('gd_notice') || '';
+
+function renderNoticeBanner(){
+  const bar = document.getElementById('notice-bar');
+  const txt = document.getElementById('notice-bar-text');
+  const hasRegion = filters.region !== 'all-region';
+  // 지역 필터 선택 시엔 공지 숨김 (region-chip 우선)
+  if(noticeText && !hasRegion){
+    txt.textContent = '📢 ' + noticeText;
+    bar.className = 'notice-bar on';
+  } else {
+    bar.className = 'notice-bar';
+  }
+}
+
 // ==================== 렌더 ====================
 function renderAll(){
   const filtered=getFiltered();
   document.getElementById('result-bar').textContent=`시설 ${filtered.length}개 표시 중`;
 
-  // 지역 칩
+  // 지역 칩 (필터 선택 시만 표시)
   const chip=document.getElementById('region-chip');
   if(filters.region!=='all-region'){
     chip.textContent=`📍 ${filters.region} — 탭해서 해제`;
     chip.className='region-chip on';
     chip.onclick=()=>setFilter('region','all-region');
   } else {
-    chip.textContent='🗺️ 행정동을 탭해서 지역 필터';
     chip.className='region-chip';
     chip.onclick=null;
   }
+
+  // 공지 배너
+  renderNoticeBanner();
 
   // 지도 이동
   if(kakaoMap&&filters.region!=='all-region'){
@@ -1436,6 +1458,17 @@ function renderTable(){
     ${paginator(facilityPage, totalFPages, 'goFacilityPage')}
     <div id="form-area"></div>
     <div style="margin-top:24px;border-top:1px solid var(--bdr);padding-top:18px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px;">📢 공지 및 안내</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="notice-input" class="form-inp" style="flex:1;min-width:200px;"
+          placeholder="공지 내용 입력 (비워두면 표시 안 됨)"
+          value="${noticeText}"/>
+        <button class="btn-submit" style="padding:9px 16px;font-size:12px;white-space:nowrap;" onclick="saveNotice()">저장</button>
+        <button class="act-btn" style="padding:9px 14px;font-size:12px;white-space:nowrap;" onclick="clearNotice()">삭제</button>
+      </div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:6px;">💡 지도 상단에 한 줄로 표시돼요. 비워두면 아무것도 표시되지 않아요.</div>
+    </div>
+    <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="font-size:14px;font-weight:700;">📋 Release Note</div>
         <button class="btn-submit" style="padding:7px 14px;font-size:12px;" onclick="showReleaseForm()">+ 추가</button>
@@ -1448,6 +1481,24 @@ function renderTable(){
 
 function goFacilityPage(p){ facilityPage=p; renderTable(); }
 function goReleasePage(p){ releasePage=p; renderTable(); }
+
+// ==================== 공지 관리 ====================
+function saveNotice(){
+  const val = document.getElementById('notice-input').value.trim();
+  noticeText = val;
+  localStorage.setItem('gd_notice', val);
+  renderNoticeBanner();
+  alert(val ? `공지가 저장되었어요!\n"${val}"` : '공지가 삭제되었어요!');
+}
+function clearNotice(){
+  if(!confirm('공지를 삭제할까요?')) return;
+  noticeText = '';
+  localStorage.setItem('gd_notice', '');
+  const inp = document.getElementById('notice-input');
+  if(inp) inp.value = '';
+  renderNoticeBanner();
+  alert('공지가 삭제되었어요!');
+}
 
 function renderReleaseListPage(items, startIdx){
   if(!releaseNotes.length) return '<div style="font-size:12px;color:var(--tx3);padding:6px 0;">아직 작성된 내역이 없어요.</div>';
