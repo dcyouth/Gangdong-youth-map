@@ -627,7 +627,10 @@ let facilitiesLoaded = false;
 
 const RC={'강일동':[37.5650,127.1739],'상일동':[37.5502,127.1721],'고덕동':[37.5588,127.1580],'암사동':[37.5527,127.1335],'명일동':[37.5488,127.1478],'천호동':[37.5427,127.1307],'길동':[37.5345,127.1427],'성내동':[37.5296,127.1283],'둔촌동':[37.5333,127.1420]};
 
-let ADMIN_PW="1234",adminUnlocked=false,editingIdx=null;
+// 비밀번호는 SHA-256 해시값으로 저장 (소스 노출 방지)
+// 변경 방법: https://emn178.github.io/online-tools/sha256.html 에서 새 비밀번호 입력 → 해시값 복사 → 아래 값 교체 후 GitHub 업로드
+const ADMIN_PW_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4'; // 현재 비밀번호: 1234
+let adminUnlocked=false,editingIdx=null;
 let filters={type:'all-type',region:'all-region',target:'all-target',day:'all-day'};
 let curTab='map',drawerOpen=false;
 let kakaoMap, markers=[], currentOverlay=null;
@@ -1480,8 +1483,17 @@ function renderPw(){
   </div>`;
 }
 function checkPw(){
-  if(document.getElementById('pw-inp').value===ADMIN_PW){adminUnlocked=true;renderTable();}
-  else document.getElementById('pw-err').style.display='block';
+  const input = document.getElementById('pw-inp').value;
+  crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+    .then(buf => {
+      const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      if(hash === ADMIN_PW_HASH){
+        adminUnlocked=true;
+        renderTable();
+      } else {
+        document.getElementById('pw-err').style.display='block';
+      }
+    });
 }
 // ==================== 관리자 페이지네이션 ====================
 let facilityPage = 1;
@@ -1829,6 +1841,15 @@ document.addEventListener('click', function(e){
   const href = a.getAttribute('data-href');
   if(href) window.open(href, '_blank');
 });
+
+// ==================== PWA Service Worker ====================
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/Gangdong-youth-map/sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(()=>console.log('SW registration failed'));
+  });
+}
 
 window.addEventListener('load', ()=>{
   kakao.maps.load(()=>{
