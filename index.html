@@ -633,7 +633,7 @@ const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyJ_5PWMCVvWZjNaGN81H
 const CACHE_KEY = 'gd_facilities_cache';
 const CACHE_TS_KEY = 'gd_facilities_ts';
 const CACHE_VER_KEY = 'gd_cache_ver';
-const CACHE_VER = '20260324'; // 코드 업데이트 시 이 값을 바꾸면 캐시 자동 초기화
+const CACHE_VER = '20260325'; // 코드 업데이트 시 이 값을 바꾸면 캐시 자동 초기화
 
 // 캐시 버전 체크 - 버전 다르면 캐시 삭제
 if(localStorage.getItem(CACHE_VER_KEY) !== CACHE_VER){
@@ -667,6 +667,7 @@ function loadFacilitiesFromSheet(forceRefresh=false){
       facilities = JSON.parse(cached);
       noticeText = localStorage.getItem('gd_notice_cache') || '';
       sheetReleases = JSON.parse(localStorage.getItem('gd_releases_cache') || '[]');
+      sheetEvents = JSON.parse(localStorage.getItem('gd_events_cache') || '[]');
       renderNoticeBanner();
       facilitiesLoaded = true;
       renderAll();
@@ -692,6 +693,10 @@ function loadFacilitiesFromSheet(forceRefresh=false){
             sheetReleases = res.releases || [];
             localStorage.setItem('gd_releases_cache', JSON.stringify(sheetReleases));
             renderAboutReleaseNotes();
+          }
+          if(res.events !== undefined){
+            sheetEvents = res.events || [];
+            localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
           }
           localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
           localStorage.setItem(CACHE_TS_KEY, serverTs);
@@ -724,6 +729,11 @@ function loadFacilitiesFromSheet(forceRefresh=false){
         sheetReleases = res.releases || [];
         localStorage.setItem('gd_releases_cache', JSON.stringify(sheetReleases));
         renderAboutReleaseNotes();
+      }
+      // 이벤트 업데이트
+      if(res.events !== undefined){
+        sheetEvents = res.events || [];
+        localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
       }
       // 캐시 저장
       localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
@@ -850,6 +860,11 @@ function adminRefreshSheet(){
         localStorage.setItem('gd_releases_cache', JSON.stringify(sheetReleases));
         renderAboutReleaseNotes();
       }
+      // 이벤트 업데이트
+      if(res.events !== undefined){
+        sheetEvents = res.events || [];
+        localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
+      }
       // lastUpdated 시트에 기록 → 다른 기기들이 자동 감지
       const serverTs = res.lastUpdated || new Date().toISOString();
       localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
@@ -872,9 +887,14 @@ function adminRefreshSheet(){
 }
 
 function adminBatchGeocode(){
-  const targets = facilities.filter(f => f.address && (!f.lat || !f.lng));
-  if(!targets.length){ alert('좌표가 없는 시설이 없어요!'); return; }
-  if(!confirm(`좌표가 없는 시설 ${targets.length}개의 좌표를 일괄 변환할까요?`)) return;
+  const facTargets = facilities.filter(f => f.address && (!f.lat || !f.lng))
+    .map(f => ({kind:'fac', id:f.id, address:f.address, name:f.name}));
+  const evTargets = sheetEvents.filter(ev => ev.address && (!ev.lat || !ev.lng))
+    .map(ev => ({kind:'ev', id:ev.no, address:ev.address, name:ev.name}));
+  const targets = [...facTargets, ...evTargets];
+
+  if(!targets.length){ alert('좌표가 없는 항목이 없어요!'); return; }
+  if(!confirm(`좌표가 없는 항목 ${targets.length}개(시설 ${facTargets.length} / 이벤트 ${evTargets.length})의 좌표를 일괄 변환할까요?`)) return;
 
   const btn = document.getElementById('btn-batch-geo');
   if(btn){ btn.disabled=true; btn.textContent='변환 중...'; }
@@ -884,26 +904,36 @@ function adminBatchGeocode(){
 
   const processNext = (idx) => {
     if(idx >= targets.length){
-      // 전체 완료 → 캐시 저장 + 렌더
       localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
+      localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
       renderAll(); renderTable();
       if(btn){ btn.disabled=false; btn.textContent='📍 좌표 일괄변환'; }
       alert(`완료! 성공 ${done}개, 실패 ${fail}개`);
       return;
     }
-    const f = targets[idx];
-    geocoder.addressSearch(f.address, (result, status) => {
+    const t = targets[idx];
+    geocoder.addressSearch(t.address, (result, status) => {
       if(status === kakao.maps.services.Status.OK){
-        const fi = facilities.findIndex(x => x.id === f.id);
-        if(fi !== -1){
-          facilities[fi].lat = parseFloat(result[0].y);
-          facilities[fi].lng = parseFloat(result[0].x);
-          // 시트에도 저장
-          sheetPost({action:'update', data: rowToSheetData(facilities[fi])});
+        const lat = parseFloat(result[0].y);
+        const lng = parseFloat(result[0].x);
+        if(t.kind === 'fac'){
+          const fi = facilities.findIndex(x => x.id === t.id);
+          if(fi !== -1){
+            facilities[fi].lat = lat;
+            facilities[fi].lng = lng;
+            sheetPost({action:'update', data: rowToSheetData(facilities[fi])});
+          }
+        } else {
+          const ei = sheetEvents.findIndex(x => String(x.no) === String(t.id));
+          if(ei !== -1){
+            sheetEvents[ei].lat = lat;
+            sheetEvents[ei].lng = lng;
+            sheetPost({action:'updateEventCoord', no: t.id, lat, lng});
+          }
         }
         done++;
       } else { fail++; }
-      setTimeout(() => processNext(idx+1), 300); // API 과부하 방지
+      setTimeout(() => processNext(idx+1), 300);
     });
   };
   processNext(0);
@@ -1137,6 +1167,46 @@ function showShareToast(msg){
 }
 let noticeText = '';
 let sheetReleases = JSON.parse(localStorage.getItem('gd_releases_cache') || '[]');
+let sheetEvents = JSON.parse(localStorage.getItem('gd_events_cache') || '[]');
+
+// ==================== 이벤트 유틸 ====================
+// "2026.10.01. 00:00" 형식 → Date 객체
+function parseEventDate(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/(\d{4})\.(\d{1,2})\.(\d{1,2})\.?\s*(\d{1,2}):(\d{2})/);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]);
+}
+
+// 현재 노출 기간에 해당하는 이벤트만 반환
+function getActiveEvents(){
+  const now = new Date();
+  return sheetEvents.filter(ev => {
+    if(!ev.name || !ev.lat || !ev.lng) return false;
+    const start = parseEventDate(ev.startAt);
+    const end   = parseEventDate(ev.endAt);
+    if(start && now < start) return false;
+    if(end && now > end) return false;
+    return true;
+  });
+}
+
+function normalizeUrl(u){
+  let url = String(u || '').trim();
+  if(!url || url==='0' || url==='undefined' || url==='null') return '';
+  if(!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  return url;
+}
+
+function openEventWebsite(no){
+  const ev = sheetEvents.find(x => String(x.no) === String(no));
+  if(!ev) return;
+  const url = normalizeUrl(ev.website);
+  if(!url) return;
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
 
 function renderNoticeBanner(){
   const bar = document.getElementById('notice-bar');
@@ -1188,8 +1258,36 @@ function renderAll(){
 
 function renderCards(list){
   const c=document.getElementById('card-list');
-  if(!list.length){c.innerHTML=`<div class="no-res"><div class="no-res-icon">🔍</div><p>조건에 맞는 시설이 없어요</p></div>`;return;}
-  c.innerHTML=list.map(f=>{
+
+  // 이벤트 카드 (맨 위, 필터 무관)
+  const activeEvents = getActiveEvents();
+  const eventHtml = activeEvents.map(ev => {
+    const web = normalizeUrl(ev.website);
+    return `<div class="fcard" style="border:1.5px solid #FCD34D;background:linear-gradient(180deg,#FFFBEB 0%,#FFFFFF 60%);" onclick="goToEvent(${ev.no})">
+      <div class="card-top">
+        <div class="card-name">${ev.name}</div>
+        <span style="background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;white-space:nowrap;">⭐ 이벤트</span>
+      </div>
+      ${ev.desc?`<div class="card-desc">${ev.desc}</div>`:''}
+      <div class="card-info">
+        ${ev.datetime?`<div class="card-info-row" style="color:#B45309;font-weight:600;">🗓️ ${ev.datetime}</div>`:''}
+        ${ev.address?`<div class="card-info-row">📍 ${ev.address}</div>`:''}
+        ${ev.phone?`<div class="card-info-row">📞 <a href="tel:${ev.phone}" onclick="event.stopPropagation()" class="card-tel">${ev.phone}</a></div>`:''}
+        ${web?`<div class="card-info-row">🔗 <a class="card-web" href="javascript:void(0)" onclick="openEventWebsite(${ev.no});event.stopPropagation();">${web}</a></div>`:''}
+      </div>
+      <div class="card-foot">
+        <span class="card-reg">⭐ 진행 중</span>
+        <a class="kakao-map-btn" href="https://map.kakao.com/link/map/${encodeURIComponent(ev.name)},${ev.lat},${ev.lng}" target="_blank" onclick="event.stopPropagation()">카카오맵에서 보기</a>
+      </div>
+    </div>`;
+  }).join('');
+
+  if(!list.length){
+    c.innerHTML = eventHtml + `<div class="no-res"><div class="no-res-icon">🔍</div><p>조건에 맞는 시설이 없어요</p></div>`;
+    return;
+  }
+
+  c.innerHTML = eventHtml + list.map(f=>{
     const col=getCol(f.type);
     return `<div class="fcard" id="card-${f.id}" onclick="selectFacility(${f.id})">
       <div class="card-top"><div class="card-name">${f.name}</div><span class="tbadge ${col.badge}">${f.type}</span></div>
@@ -1209,6 +1307,20 @@ function renderCards(list){
       </div>
     </div>`;
   }).join('');
+}
+
+// 이벤트 카드 클릭 → 지도 이동 + 시트 표시
+function goToEvent(no){
+  const ev = sheetEvents.find(x => String(x.no) === String(no));
+  if(!ev || !ev.lat || !ev.lng) return;
+  switchTab('map');
+  setTimeout(()=>{
+    if(kakaoMap){
+      kakaoMap.setLevel(4);
+      kakaoMap.panTo(new kakao.maps.LatLng(ev.lat, ev.lng));
+    }
+    showEventSheet(ev);
+  }, 250);
 }
 
 function renderMarkers(list){
@@ -1300,6 +1412,64 @@ function renderMarkers(list){
     overlay.setMap(kakaoMap);
     markers.push(overlay);
   });
+
+  // ==================== 이벤트 핀 (필터 무관, 항상 표시) ====================
+  getActiveEvents().forEach(ev => {
+    const el = document.createElement('div');
+    el.style.cssText = `
+      width:42px;height:42px;
+      background:#FFC107;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      border:3px solid #fff;
+      box-shadow:0 3px 12px rgba(0,0,0,.35);
+      cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+    `;
+    const star = document.createElement('span');
+    star.style.cssText = 'transform:rotate(45deg);font-size:18px;line-height:1;';
+    star.textContent = '⭐';
+    el.appendChild(star);
+
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      showEventSheet(ev);
+      closeDrawer();
+    });
+
+    const ov = new kakao.maps.CustomOverlay({
+      position: new kakao.maps.LatLng(ev.lat, ev.lng),
+      content: el,
+      yAnchor: 1,
+      zIndex: 5   // 이벤트가 최상단
+    });
+    ov.setMap(kakaoMap);
+    markers.push(ov);
+  });
+}
+
+// ==================== 이벤트 시트 ====================
+function showEventSheet(ev){
+  closeSheet();
+  closeDrawer();
+  const body = document.getElementById('map-sheet-body');
+  const web  = normalizeUrl(ev.website);
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+      <span style="background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;">⭐ 이벤트</span>
+    </div>
+    <div class="sheet-name">${ev.name}</div>
+    ${ev.desc?`<div class="sheet-desc">${ev.desc}</div>`:''}
+    ${ev.datetime?`<div class="sheet-row"><span class="sheet-lbl">일시</span><span class="sheet-val" style="font-weight:600;color:#B45309;">${ev.datetime}</span></div>`:''}
+    ${ev.address?`<div class="sheet-row"><span class="sheet-lbl">장소</span><span class="sheet-val">${ev.address}</span></div>`:''}
+    ${ev.phone?`<div class="sheet-row"><span class="sheet-lbl">문의</span><a class="sheet-tel" href="tel:${ev.phone}">${ev.phone}</a></div>`:''}
+    ${web?`<div class="sheet-row"><span class="sheet-lbl">공식링크</span><a class="sheet-link" href="javascript:void(0)" onclick="openEventWebsite(${ev.no});event.stopPropagation();">${web}</a></div>`:''}
+    <div class="sheet-btns">
+      <a class="sheet-btn-kakao" href="https://map.kakao.com/link/map/${encodeURIComponent(ev.name)},${ev.lat},${ev.lng}" target="_blank">카카오맵에서 보기</a>
+      <button class="sheet-btn-list" onclick="closeSheet()">닫기</button>
+    </div>`;
+  document.getElementById('map-sheet').classList.add('on');
+  document.getElementById('map-sheet-bg').classList.add('on');
 }
 
 // 여러 시설이 같은 위치일때 순서대로 시트
@@ -1628,6 +1798,31 @@ function renderTable(){
         : `<div style="font-size:13px;color:var(--tx3);padding:8px 0;">현재 등록된 공지가 없어요.</div>`
       }
       <div style="font-size:11px;color:var(--tx3);margin-top:6px;">💡 공지는 구글 시트 <strong>notice</strong> 탭에서 수정 후 🔄 업데이트 버튼을 눌러주세요.</div>
+    </div>
+    <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px;">⭐ 이벤트 (최대 5개)</div>
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:10px;">💡 구글 시트 <strong>event</strong> 탭에서 수정 후 🔄 업데이트 버튼을 눌러주세요.</div>
+      ${sheetEvents.length ? sheetEvents.map(ev=>{
+        const now = new Date();
+        const start = parseEventDate(ev.startAt);
+        const end = parseEventDate(ev.endAt);
+        let statusTxt = '진행 중', statusBg = '#DCFCE7', statusFg = '#166534';
+        if(start && now < start){ statusTxt='노출 예정'; statusBg='#DBEAFE'; statusFg='#1E40AF'; }
+        else if(end && now > end){ statusTxt='종료됨'; statusBg='#F3F4F6'; statusFg='#6B7280'; }
+        const noCoord = (!ev.lat || !ev.lng);
+        return `
+        <div style="padding:10px 0;border-bottom:1px solid var(--bdr);">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+            <span style="background:${statusBg};color:${statusFg};font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;">${statusTxt}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--tx1);">${ev.name}</span>
+            ${noCoord?`<span style="background:#FEE2E2;color:#991B1B;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;">좌표 없음</span>`:''}
+          </div>
+          <div style="font-size:12px;color:var(--tx2);">${ev.datetime||''}</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px;">노출: ${ev.startAt||'-'} ~ ${ev.endAt||'-'}</div>
+        </div>`;
+      }).join('')
+        : `<div style="font-size:13px;color:var(--tx3);padding:8px 0;">등록된 이벤트가 없어요.</div>`
+      }
     </div>
     <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px;">📋 Release Note</div>
