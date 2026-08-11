@@ -1196,17 +1196,37 @@ function parseEventDate(str){
   return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]);
 }
 
-// 현재 노출 기간에 해당하는 이벤트만 반환
+// 이벤트 일시("2026.11.07.(토) 13:00~17:00") → 정렬용 Date
+function parseEventDateTime(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+  if(!m) return null;
+  // 시간이 있으면 함께 파싱
+  const t = String(str).match(/(\d{1,2}):(\d{2})/);
+  return new Date(+m[1], +m[2]-1, +m[3], t?+t[1]:0, t?+t[2]:0);
+}
+
+// 현재 노출 기간에 해당하는 이벤트만 반환 (일자 오름차순 정렬)
 function getActiveEvents(){
   const now = new Date();
-  return sheetEvents.filter(ev => {
-    if(!ev.name || !ev.lat || !ev.lng) return false;
-    const start = parseEventDate(ev.startAt);
-    const end   = parseEventDate(ev.endAt);
-    if(start && now < start) return false;
-    if(end && now > end) return false;
-    return true;
-  });
+  return sheetEvents
+    .filter(ev => {
+      if(!ev.name || !ev.lat || !ev.lng) return false;
+      const start = parseEventDate(ev.startAt);
+      const end   = parseEventDate(ev.endAt);
+      if(start && now < start) return false;
+      if(end && now > end) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const da = parseEventDateTime(a.datetime);
+      const db = parseEventDateTime(b.datetime);
+      // 일시 없으면 맨 뒤로
+      if(!da && !db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return da - db; // 가까운 날짜가 위로
+    });
 }
 
 function normalizeUrl(u){
@@ -1293,8 +1313,7 @@ function renderCards(list){
         ${ev.phone?`<div class="card-info-row">📞 <a href="tel:${ev.phone}" onclick="event.stopPropagation()" class="card-tel">${ev.phone}</a></div>`:''}
         ${web?`<div class="card-info-row">🔗 <a class="card-web" href="javascript:void(0)" onclick="openEventWebsite(${ev.no});event.stopPropagation();">${web}</a></div>`:''}
       </div>
-      <div class="card-foot">
-        <span class="card-reg">⭐ 진행 중</span>
+      <div class="card-foot" style="justify-content:flex-end;">
         <a class="kakao-map-btn" href="https://map.kakao.com/link/map/${encodeURIComponent(ev.name)},${ev.lat},${ev.lng}" target="_blank" onclick="event.stopPropagation()">카카오맵에서 보기</a>
       </div>
     </div>`;
@@ -1857,7 +1876,14 @@ function renderTable(){
     <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:10px;">⭐ 이벤트 (최대 5개)</div>
       <div style="font-size:11px;color:var(--tx3);margin-bottom:10px;">💡 구글 시트 <strong>event</strong> 탭에서 수정 후 🔄 업데이트 버튼을 눌러주세요.</div>
-      ${sheetEvents.length ? sheetEvents.map(ev=>{
+      ${sheetEvents.length ? [...sheetEvents].sort((a,b)=>{
+        const da = parseEventDateTime(a.datetime);
+        const db = parseEventDateTime(b.datetime);
+        if(!da && !db) return 0;
+        if(!da) return 1;
+        if(!db) return -1;
+        return da - db;
+      }).map(ev=>{
         const now = new Date();
         const start = parseEventDate(ev.startAt);
         const end = parseEventDate(ev.endAt);
