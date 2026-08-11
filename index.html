@@ -648,9 +648,12 @@ let facilitiesLoaded = false;
 
 const RC={'강일동':[37.5650,127.1739],'상일동':[37.5502,127.1721],'고덕동':[37.5588,127.1580],'암사동':[37.5527,127.1335],'명일동':[37.5488,127.1478],'천호동':[37.5427,127.1307],'길동':[37.5345,127.1427],'성내동':[37.5296,127.1283],'둔촌동':[37.5333,127.1420]};
 
-// 비밀번호는 SHA-256 해시값으로 저장 (소스 노출 방지)
-// 변경 방법: https://emn178.github.io/online-tools/sha256.html 에서 새 비밀번호 입력 → 해시값 복사 → 아래 값 교체 후 GitHub 업로드
-const ADMIN_PW_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4'; // 현재 비밀번호: 1234
+// ==================== 관리자 비밀번호 ====================
+// [방법 1] 구글 시트 password 탭에서 변경 (일반 담당자용) — sheetPwHash에 자동 로드됨
+// [방법 2] 마스터 비밀번호 (총괄 담당자용) — 아래 해시값 교체 시 GitHub 업로드 필요
+//          변경: https://emn178.github.io/online-tools/sha256.html 에서 새 비밀번호 해시값 생성
+const MASTER_PW_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4'; // 마스터 비밀번호: 1234
+let sheetPwHash = localStorage.getItem('gd_pw_hash') || ''; // 구글 시트에서 로드됨
 let adminUnlocked=false,editingIdx=null;
 let filters={type:'all-type',region:'all-region',target:'all-target',day:'all-day'};
 let curTab='map',drawerOpen=false;
@@ -668,6 +671,7 @@ function loadFacilitiesFromSheet(forceRefresh=false){
       noticeText = localStorage.getItem('gd_notice_cache') || '';
       sheetReleases = JSON.parse(localStorage.getItem('gd_releases_cache') || '[]');
       sheetEvents = JSON.parse(localStorage.getItem('gd_events_cache') || '[]');
+      sheetPwHash = localStorage.getItem('gd_pw_hash') || '';
       renderNoticeBanner();
       facilitiesLoaded = true;
       renderAll();
@@ -697,6 +701,10 @@ function loadFacilitiesFromSheet(forceRefresh=false){
           if(res.events !== undefined){
             sheetEvents = res.events || [];
             localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
+          }
+          if(res.pwHash !== undefined){
+            sheetPwHash = res.pwHash || '';
+            localStorage.setItem('gd_pw_hash', sheetPwHash);
           }
           localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
           localStorage.setItem(CACHE_TS_KEY, serverTs);
@@ -734,6 +742,11 @@ function loadFacilitiesFromSheet(forceRefresh=false){
       if(res.events !== undefined){
         sheetEvents = res.events || [];
         localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
+      }
+      // 비밀번호 해시 업데이트
+      if(res.pwHash !== undefined){
+        sheetPwHash = res.pwHash || '';
+        localStorage.setItem('gd_pw_hash', sheetPwHash);
       }
       // 캐시 저장
       localStorage.setItem(CACHE_KEY, JSON.stringify(facilities));
@@ -864,6 +877,11 @@ function adminRefreshSheet(){
       if(res.events !== undefined){
         sheetEvents = res.events || [];
         localStorage.setItem('gd_events_cache', JSON.stringify(sheetEvents));
+      }
+      // 비밀번호 해시 업데이트
+      if(res.pwHash !== undefined){
+        sheetPwHash = res.pwHash || '';
+        localStorage.setItem('gd_pw_hash', sheetPwHash);
       }
       // lastUpdated 시트에 기록 → 다른 기기들이 자동 감지
       const serverTs = res.lastUpdated || new Date().toISOString();
@@ -1714,7 +1732,8 @@ function checkPw(){
   crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
     .then(buf => {
       const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-      if(hash === ADMIN_PW_HASH){
+      // ① 구글 시트 비밀번호  ② 마스터 비밀번호 — 둘 중 하나만 맞으면 통과
+      if((sheetPwHash && hash === sheetPwHash) || hash === MASTER_PW_HASH){
         adminUnlocked=true;
         renderTable();
       } else {
@@ -1823,6 +1842,17 @@ function renderTable(){
       }).join('')
         : `<div style="font-size:13px;color:var(--tx3);padding:8px 0;">등록된 이벤트가 없어요.</div>`
       }
+    </div>
+    <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px;">🔐 비밀번호 관리</div>
+      <div style="background:#F0F4FF;border:1px solid #C4D4F8;border-radius:10px;padding:12px 14px;font-size:12px;color:var(--tx2);line-height:1.8;">
+        <strong>방법 1 · 구글 시트에서 변경</strong> (일반 담당자)<br>
+        구글 시트 <strong>password</strong> 탭 → B2 셀에 새 비밀번호 입력 → 🔄 업데이트 클릭<br><br>
+        <strong>방법 2 · 마스터 비밀번호</strong> (총괄 담당자)<br>
+        시트 비밀번호를 잊었을 때 사용하는 복구용 비밀번호예요.<br>
+        변경하려면 GitHub의 index.html에서 MASTER_PW_HASH 값을 수정해야 해요.
+      </div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:6px;">💡 두 비밀번호 중 하나만 맞아도 로그인됩니다.</div>
     </div>
     <div style="margin-top:20px;border-top:1px solid var(--bdr);padding-top:18px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px;">📋 Release Note</div>
