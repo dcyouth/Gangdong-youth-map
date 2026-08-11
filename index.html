@@ -268,7 +268,7 @@ button,input,select,a{font-family:inherit;}
 .fcol2{grid-column:1/-1;}
 .btn-submit{background:var(--primary);color:#fff;border:none;border-radius:var(--rs);padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;min-height:42px;}
 .pw-wrap{padding:32px 18px;display:flex;flex-direction:column;align-items:center;gap:11px;}
-.pw-inp{padding:12px 14px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:15px;width:210px;text-align:center;letter-spacing:5px;}
+.pw-inp{padding:12px 16px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:15px;width:240px;text-align:center;letter-spacing:1px;}
 .pw-inp:focus{outline:none;border-color:var(--primary);}
 .pw-btn{background:var(--primary);color:#fff;border:none;border-radius:var(--rs);padding:12px 36px;font-size:14px;font-weight:700;cursor:pointer;min-height:46px;}
 .pw-err{color:#E53E3E;font-size:13px;display:none;}
@@ -1715,14 +1715,31 @@ function closeAbout(){
 }
 
 // ==================== 관리자 ====================
-function openAdmin(){document.getElementById('admin-modal').classList.add('show');if(!adminUnlocked)renderPw();else renderTable();}
+function openAdmin(){
+  document.getElementById('admin-modal').classList.add('show');
+  if(!adminUnlocked){
+    renderPw();
+    // 최신 비밀번호를 시트에서 가져오기 (백그라운드)
+    fetch(SHEET_URL)
+      .then(r => r.json())
+      .then(res => {
+        if(res.pwHash !== undefined){
+          sheetPwHash = res.pwHash || '';
+          localStorage.setItem('gd_pw_hash', sheetPwHash);
+        }
+      })
+      .catch(()=>{});
+  } else {
+    renderTable();
+  }
+}
 function closeAdmin(){document.getElementById('admin-modal').classList.remove('show');editingIdx=null;}
 
 function renderPw(){
   document.getElementById('admin-body').innerHTML=`<div class="pw-wrap">
     <div style="font-size:40px;">🔐</div>
     <div style="font-size:17px;font-weight:700;">관리자 로그인</div>
-    <input class="pw-inp" type="password" id="pw-inp" placeholder="●●●●" onkeydown="if(event.key==='Enter')checkPw()"/>
+    <input class="pw-inp" type="password" id="pw-inp" placeholder="비밀번호 입력" autocomplete="off" onkeydown="if(event.key==='Enter')checkPw()"/>
     <div class="pw-err" id="pw-err">비밀번호가 틀렸어요 🙅</div>
     <button class="pw-btn" onclick="checkPw()">확인</button>
   </div>`;
@@ -1736,9 +1753,28 @@ function checkPw(){
       if((sheetPwHash && hash === sheetPwHash) || hash === MASTER_PW_HASH){
         adminUnlocked=true;
         renderTable();
-      } else {
-        document.getElementById('pw-err').style.display='block';
+        return;
       }
+      // 실패 시 → 시트에서 최신 비밀번호 다시 받아와서 한 번 더 확인
+      const errEl = document.getElementById('pw-err');
+      if(errEl){ errEl.textContent='확인 중...'; errEl.style.display='block'; }
+      fetch(SHEET_URL)
+        .then(r => r.json())
+        .then(res => {
+          if(res.pwHash !== undefined){
+            sheetPwHash = res.pwHash || '';
+            localStorage.setItem('gd_pw_hash', sheetPwHash);
+          }
+          if(sheetPwHash && hash === sheetPwHash){
+            adminUnlocked=true;
+            renderTable();
+          } else {
+            if(errEl){ errEl.textContent='비밀번호가 틀렸어요 🙅'; errEl.style.display='block'; }
+          }
+        })
+        .catch(()=>{
+          if(errEl){ errEl.textContent='비밀번호가 틀렸어요 🙅'; errEl.style.display='block'; }
+        });
     });
 }
 // ==================== 관리자 페이지네이션 ====================
